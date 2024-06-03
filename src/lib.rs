@@ -105,29 +105,6 @@ lazy_static::lazy_static! {
     pub static ref CONFIG: String = format!("{}/config.json", &*CONFIGDIR);
     pub static ref HOME: String = std::env::var("HOME").unwrap();
     pub static ref IS_NIXOS: bool = std::path::Path::new("/etc/NIXOS").exists();
-    pub static ref HELPER_EXEC: String = match std::env::current_exe() {
-        Ok(mut e) => {
-            println!("{:?}", e);
-            e.pop(); // root/bin
-            println!("{:?}", e);
-
-            // e.pop(); // root/
-            // e.push("libexec"); // root/libexec
-            e.push("libsnow-helper");
-            println!("{:?}", e);
-
-            if e.is_file() {
-                log::trace!("Using helper executable path: {}", e.to_string_lossy());
-                e.to_string_lossy().to_string()
-            } else {
-                log::warn!("Could not determine helper executable path, using $PATH");
-                String::from("libsnow-helper")
-            }
-        }
-        Err(_) => {
-            log::warn!("Could not determine helper executable path, using $PATH");
-            String::from("libsnow-helper")
-        },
-    };
 }
 static SYSCONFIG: &str = "/etc/libsnow/config.json";
+static HELPER_EXEC: &str = "libsnow-helper";
