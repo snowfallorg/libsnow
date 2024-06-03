@@ -2,6 +2,17 @@
 name = "libsnow"
 version = "0.0.1-alpha.1"
 edition = "2021"
+license = "MIT"
+description = "An opinionated library for interacting with the Nix package manager"
+repository = "https://github.com/snowfallorg/libsnow"
+readme = "README.md"
+include = [
+  "src/*",
+  "Cargo.toml",
+  "LICENSE*",
+  "README.md",
+]
+keywords = ["nix", "nixos", "snowflakeos"]
 
 [dependencies]
 nix-editor = "0.3.0"
