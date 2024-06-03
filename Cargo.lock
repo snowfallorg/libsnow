@@ -816,7 +816,7 @@ checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
 name = "libsnow"
-version = "0.0.1"
+version = "0.0.1-alpha.1"
 dependencies = [
  "anyhow",
  "brotli",
