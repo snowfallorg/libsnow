@@ -1,14 +1,13 @@
+use super::AuthMethod;
 use crate::{config::configfile, nixos::list::list_systempackages, HELPER_EXEC};
 use anyhow::{anyhow, Context, Result};
 use log::debug;
 use tokio::io::AsyncWriteExt;
 
-use super::AuthMethod;
-
 pub async fn remove(
     pkgs: &[&str],
     db: &rusqlite::Connection,
-    auth_method: AuthMethod <'_>,
+    auth_method: AuthMethod<'_>,
 ) -> Result<()> {
     let installed = list_systempackages(db)?
         .into_iter()
@@ -70,15 +69,8 @@ pub async fn remove(
     })
     .arg("--")
     .arg("switch")
-    .args(if let Some(flake) = config.flake {
-        vec![
-            "--flake".to_string(),
-            if let Some(host) = config.host {
-                format!("{}#{}", flake, host)
-            } else {
-                flake
-            },
-        ]
+    .args(if let Ok(flakedir) = config.get_flake_dir() {
+        vec!["--flake".to_string(), flakedir]
     } else {
         vec![]
     })

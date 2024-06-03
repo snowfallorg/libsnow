@@ -1,44 +1,9 @@
-use std::path::PathBuf;
-
 use crate::{
     metadata::{database::DatabaseCacheEntry, revision::get_latest_nixpkgs_revision},
     Package, PackageAttr, PackageUpdate,
 };
 use anyhow::{Context, Result};
 use log::debug;
-// use serde::Deserialize;
-// use std::process::Command;
-
-// #[derive(Debug, Deserialize, Clone)]
-// pub struct Derivation {
-//     pub env: DerivationEnv,
-//     pub name: String,
-//     pub system: String,
-// }
-
-// #[derive(Debug, Deserialize, Clone)]
-// pub struct DerivationEnv {
-//     pub name: String,
-//     pub pname: Option<String>,
-//     pub out: String,
-//     pub system: String,
-//     pub version: Option<String>,
-// }
-
-// pub fn get_drv(path: &str) -> Result<Derivation> {
-//     let derivation: HashMap<String, Derivation> = serde_json::from_slice(
-//         &Command::new("nix")
-//             .arg("--experimental-features")
-//             .arg("nix-command")
-//             .arg("derivation")
-//             .arg("show")
-//             .arg(path)
-//             .output()?
-//             .stdout,
-//     )?;
-//     let output = *derivation.values().collect::<Vec<_>>().get(0).context("No derivation found")?;
-//     return Ok(output.clone());
-// }
 
 pub fn get_name_from_storepath(path: &str) -> Result<String> {
     let name = path.split("/").last().context("No name found")?;
@@ -96,33 +61,6 @@ pub fn get_version_from_storepath(path: &str, pname: &str) -> Result<String> {
         .context("No version found")?;
     Ok(version.to_string())
 }
-
-// // Usually not cached, so may take a while
-// // Online access potentially required
-// pub fn nixpkgs_source() -> Result<String> {
-//     // If flakes, check flake
-//     // nix eval .\#pkgs.x86_64-linux.nixpkgs.path
-//     let path = if let Some(flake) = getconfig()?.flake {
-//         let output = Command::new("nix")
-//             .arg("eval")
-//             .arg("--extra-experimental-features")
-//             .arg("nix-command flakes")
-//             .arg(format!("{}/#pkgs.x86_64-linux.nixpkgs.path", flake))
-//             .output()?;
-//         let stdout = String::from_utf8(output.stdout)?;
-//         stdout.trim().to_string()
-//     } else {
-//         // nix-instantiate --eval -E 'with import <nixpkgs> {}; pkgs.path'
-//         let output = Command::new("nix-instantiate")
-//             .arg("--eval")
-//             .arg("-E")
-//             .arg("with import <nixpkgs> {}; pkgs.path")
-//             .output()?;
-//         let stdout = String::from_utf8(output.stdout)?;
-//         stdout.trim().to_string()
-//     };
-//     Ok(path)
-// }
 
 pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
     let mut updatable = vec![];

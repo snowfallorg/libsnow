@@ -1,9 +1,7 @@
-use std::path::Path;
-
 use crate::{
     config::configfile::get_config, homemanager::list::list, utils, PackageUpdate, HELPER_EXEC,
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use log::debug;
 
 pub async fn updatable(db: &rusqlite::Connection) -> Result<Vec<PackageUpdate>> {

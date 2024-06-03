@@ -2,7 +2,7 @@ use crate::{utils::misc::get_pname_version_from_storepath, Package, PackageAttr,
 use anyhow::{Context, Result};
 use log::debug;
 use serde::Deserialize;
-use std::{collections::HashMap, fs::File};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 struct ProfilePkgsRoot {
@@ -35,7 +35,10 @@ pub fn list() -> Result<Vec<Package>> {
         if let (Some(attrpath), Some(originalurl)) = (pkg.attrpath, pkg.originalurl) {
             let storepath = pkg.storepaths[0].clone();
 
-            debug!("Listing package: {} {} {}", attrpath, originalurl, storepath);
+            debug!(
+                "Listing package: {} {} {}",
+                attrpath, originalurl, storepath
+            );
             // let derivation = get_drv(&storepath)?;
 
             let (pname, version) = get_pname_version_from_storepath(&storepath)?;
@@ -77,8 +80,13 @@ pub fn name_from_attr(attr: &str) -> Result<String> {
                     return Ok(pkg.profile_name.context("Profile name not found")?);
                 }
             }
-            PackageAttr::External { url, attr: ext_attr } => {
-                if ext_attr == format!("{}#{}", url, attr) || (ext_attr.ends_with(".default") && url == attr) {
+            PackageAttr::External {
+                url,
+                attr: ext_attr,
+            } => {
+                if ext_attr == format!("{}#{}", url, attr)
+                    || (ext_attr.ends_with(".default") && url == attr)
+                {
                     return Ok(pkg.profile_name.context("Profile name not found")?);
                 }
             }

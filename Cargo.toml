@@ -2,11 +2,6 @@
 name = "libsnow"
 version = "0.0.1"
 edition = "2021"
-default-run = "libsnow"
-
-[[bin]]
-name = "libsnow"
-path = "src/main.rs"
 
 [dependencies]
 nix-editor = "0.3.0"

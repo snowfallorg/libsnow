@@ -110,19 +110,6 @@ pub fn get_config() -> Result<LibSnowConfig> {
     }
 }
 
-// /// Writes the config struct to the config file in the user config directory (`~/.config/nix-data`).
-// pub fn setuserconfig(config: LibSnowConfig) -> Result<()> {
-//     // Check if config directory exists
-//     if !Path::new(&*CONFIGDIR).exists() {
-//         fs::create_dir_all(&*CONFIGDIR)?;
-//     }
-
-//     // Write user config
-//     let mut file = File::create(&*CONFIG)?;
-//     file.write_all(serde_json::to_string_pretty(&config)?.as_bytes())?;
-//     Ok(())
-// }
-
 /// Get the use package type
 pub fn get_user_pkg_type() -> UserPkgType {
     let userpkgtype = if Path::new(&format!("{}/.nix-profile/manifest.json", &*HOME)).exists()
@@ -139,36 +126,3 @@ pub fn get_user_pkg_type() -> UserPkgType {
     };
     return userpkgtype;
 }
-
-// /// Get the configuration file
-// pub fn get_system_config_file() -> Result<String> {
-//     let config = getconfig()?;
-//     let path = if let Some(systemconfig) = config.systemconfig {
-//         systemconfig
-//     } else {
-//         String::from("/etc/nixos/configuration.nix")
-//     };
-//     return Ok(fs::read_to_string(path)?);
-// }
-
-// /// Get the home configuration file
-// pub fn get_home_config_file() -> Result<String> {
-//     let config = getconfig()?;
-//     let path = if let Some(homeconfig) = config.homeconfig {
-//         homeconfig
-//     } else {
-//         String::from(format!("{}/.config/nixpkgs/home.nix", &*HOME))
-//     };
-//     return Ok(fs::read_to_string(path)?);
-// }
-
-// /// Get the flake file
-// pub fn get_flake_file() -> Result<String> {
-//     let config = getconfig()?;
-//     let path = if let Some(flake) = config.flake {
-//         flake
-//     } else {
-//         String::from("/etc/nixos/flake.nix")
-//     };
-//     return Ok(fs::read_to_string(path)?);
-// }
