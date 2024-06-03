@@ -1,7 +1,7 @@
 
 use std::fmt::Result;
 
-use libsnow::{config::configfile::get_config_file, homemanager, metadata::{database::{database_connection, fetch_database}, revision::{get_profile_revision, get_revision}}, nixos::list::{list_references, list_systempackages}, profile::{install::install, list::list, update::updatable}, utils::misc::get_pname_from_storepath, NIXARCH};
+use libsnow::{homemanager, metadata::{database::{database_connection, fetch_database}, revision::{get_profile_revision, get_revision}}, nixos::{AuthMethod, list::{list_references, list_systempackages}}, profile::{install::install, list::list, update::updatable}, utils::misc::get_pname_from_storepath, NIXARCH};
 
 #[tokio::main]
 async fn main() {
@@ -15,7 +15,12 @@ async fn main() {
     // let pkgs = list_references().await.unwrap().get_attributes();
     // let pkgs = homemanager::list::list(&db).unwrap();
 
-    println!("{:#?}", libsnow::nixenv::update::updatable().await);
+    // println!("{:#?}", libsnow::nixos::remove::remove(&["vulkan-validation-layers"], &db, AuthMethod::Pkexec).await);
+    // println!("{:#?}", libsnow::nixos::update::update(AuthMethod::Sudo).await);
+    // println!("{:#?}", libsnow::nixenv::remove::remove(&["pandoc","lsd"]).await);
+    println!("{:#?}", libsnow::homemanager::install::install(&["cambalache", "neofetch"], &db).await);
+
+    // println!("{:#?}", &*libsnow::HELPER_EXEC);
 
     // println!("{:#?}", get_revision().await);
     // println!("{:#?}", list_references().await.unwrap());

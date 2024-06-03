@@ -1,0 +1,14 @@
+[package]
+name = "libsnow-helper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+users = "0.11"
+anyhow = "1.0"
+signal-hook = "0.3"
+
+[[bin]]
+name = "libsnow-helper"
+path = "src/main.rs"

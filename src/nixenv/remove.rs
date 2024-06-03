@@ -1,26 +1,25 @@
-use super::{get_channel, list::list};
+use super::list::list;
 use crate::PackageAttr;
 use anyhow::{anyhow, Result};
 use tokio::process::Command;
 
-pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
+pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
     let installed = list(db).await?;
-    let mut pkgs_to_install = Vec::new();
+    let mut pkgs_to_remove = Vec::new();
     for pkg in pkgs {
-        if installed.iter().any(|x| match x.attr {
+        if let Some(Some(pname)) = installed.iter().find(|x| match x.attr {
             PackageAttr::NixPkgs { ref attr } => attr == pkg,
             _ => false,
-        }) {
-            println!("Package {} is already installed", pkg);
+        }).map(|x| x.pname.clone()) {
+            pkgs_to_remove.push(pname);
         } else {
-            pkgs_to_install.push(pkg);
+            println!("Package {} is not installed", pkg);
         }
     }
 
-    let channel = get_channel()?;
     let status = Command::new("nix-env")
-        .arg("-iA")
-        .args(pkgs_to_install.iter().map(|x| format!("{}.{}", channel, x)))
+        .arg("--uninstall")
+        .args(pkgs_to_remove.iter())
         .status()
         .await?;
 

@@ -2,7 +2,7 @@ use anyhow::Result;
 use rayon::prelude::*;
 
 use crate::{
-    config::configfile::get_config_file,
+    config::configfile::get_config,
     utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
     Package, PackageAttr,
 };
@@ -38,14 +38,18 @@ pub async fn list_references() -> Result<Vec<Package>> {
             },
             version: x.version.clone(),
             pname: get_pname_from_storepath(x.store.as_str(), x.version).ok(),
+            ..Default::default()
         })
         .collect())
 }
 
 // List all packages in `enviroment.systemPackages`
 pub fn list_systempackages(db: &rusqlite::Connection) -> Result<Vec<Package>> {
-    let config = get_config_file()?;
-    let system_packages = nix_editor::read::getarrvals(&config, "environment.systemPackages")?;
+    let config = get_config()?;
+    let system_packages = nix_editor::read::getarrvals(
+        &config.read_system_config_file()?,
+        "environment.systemPackages",
+    )?;
     let pkgs = system_packages
         .iter()
         .map(|x| x.strip_prefix("pkgs.").unwrap_or(x).to_string())
@@ -67,6 +71,7 @@ pub fn list_systempackages(db: &rusqlite::Connection) -> Result<Vec<Package>> {
                     None
                 },
                 pname: Some(pname),
+                ..Default::default()
             });
         }
     }

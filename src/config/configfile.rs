@@ -1,10 +1,10 @@
 use crate::{CONFIG, CONFIGDIR, HOME, SYSCONFIG};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{BufReader, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 /// Struct containing locations of system configuration files and some user configuration.
@@ -24,6 +24,64 @@ pub struct LibSnowConfig {
     pub generations: Option<u32>,
 }
 
+impl LibSnowConfig {
+    pub fn write(&self) -> Result<()> {
+        if !Path::new(&*CONFIGDIR).exists() {
+            fs::create_dir_all(&*CONFIGDIR)?;
+        }
+        let mut file = File::create(&*CONFIG)?;
+        file.write_all(serde_json::to_string_pretty(&self)?.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn read_system_config_file(&self) -> Result<String> {
+        let path = if let Some(systemconfig) = self.systemconfig.clone() {
+            systemconfig
+        } else {
+            String::from("/etc/nixos/configuration.nix")
+        };
+        return Ok(fs::read_to_string(path)?);
+    }
+
+    pub fn read_home_config_file(&self) -> Result<String> {
+        let path = if let Some(homeconfig) = self.homeconfig.clone() {
+            homeconfig
+        } else {
+            String::from(format!("{}/.config/nixpkgs/home.nix", &*HOME))
+        };
+        return Ok(fs::read_to_string(path)?);
+    }
+
+    pub fn read_flake_file(&self) -> Result<String> {
+        let path = if let Some(flake) = self.flake.clone() {
+            flake
+        } else {
+            String::from("/etc/nixos/flake.nix")
+        };
+        return Ok(fs::read_to_string(path)?);
+    }
+
+    pub fn get_flake_dir(&self) -> Result<String> {
+        let flake_file = PathBuf::from(self.flake.clone().context("No flake file found")?);
+        if flake_file.is_dir() {
+            Ok(flake_file.to_str().context("No path found")?.to_string())
+        } else {
+            let flake_dir = flake_file
+                .parent()
+                .context("No parent found")?;
+            Ok(flake_dir.to_str().context("No path found")?.to_string())
+        }
+    }
+
+    pub fn get_generation_count(&self) -> Option<u32> {
+        if let Some(generations) = self.generations {
+            Some(generations)
+        } else {
+            None
+        }
+    }
+}
+
 /// Type of package management used by the user.
 /// - [Profile](UserPkgType::Profile) refers to the `nix profile` command.
 /// - [Env](UserPkgType::Env) refers to the `nix-env` command.
@@ -36,7 +94,7 @@ pub enum UserPkgType {
 /// Reads the config file and returns the config struct.
 /// If the config file doesn't exist in both the user (`~/.config/nix-data`) and system (`/etc/nix-data`) config directories,
 /// this function will return an error.
-pub fn getconfig() -> Result<LibSnowConfig> {
+pub fn get_config() -> Result<LibSnowConfig> {
     // Check if user config exists
     if Path::new(&*CONFIG).exists() {
         // Read user config
@@ -52,18 +110,18 @@ pub fn getconfig() -> Result<LibSnowConfig> {
     }
 }
 
-/// Writes the config struct to the config file in the user config directory (`~/.config/nix-data`).
-pub fn setuserconfig(config: LibSnowConfig) -> Result<()> {
-    // Check if config directory exists
-    if !Path::new(&*CONFIGDIR).exists() {
-        fs::create_dir_all(&*CONFIGDIR)?;
-    }
+// /// Writes the config struct to the config file in the user config directory (`~/.config/nix-data`).
+// pub fn setuserconfig(config: LibSnowConfig) -> Result<()> {
+//     // Check if config directory exists
+//     if !Path::new(&*CONFIGDIR).exists() {
+//         fs::create_dir_all(&*CONFIGDIR)?;
+//     }
 
-    // Write user config
-    let mut file = File::create(&*CONFIG)?;
-    file.write_all(serde_json::to_string_pretty(&config)?.as_bytes())?;
-    Ok(())
-}
+//     // Write user config
+//     let mut file = File::create(&*CONFIG)?;
+//     file.write_all(serde_json::to_string_pretty(&config)?.as_bytes())?;
+//     Ok(())
+// }
 
 /// Get the use package type
 pub fn get_user_pkg_type() -> UserPkgType {
@@ -82,35 +140,35 @@ pub fn get_user_pkg_type() -> UserPkgType {
     return userpkgtype;
 }
 
-/// Get the configuration file
-pub fn get_config_file() -> Result<String> {
-    let config = getconfig()?;
-    let path = if let Some(systemconfig) = config.systemconfig {
-        systemconfig
-    } else {
-        String::from("/etc/nixos/configuration.nix")
-    };
-    return Ok(fs::read_to_string(path)?);
-}
+// /// Get the configuration file
+// pub fn get_system_config_file() -> Result<String> {
+//     let config = getconfig()?;
+//     let path = if let Some(systemconfig) = config.systemconfig {
+//         systemconfig
+//     } else {
+//         String::from("/etc/nixos/configuration.nix")
+//     };
+//     return Ok(fs::read_to_string(path)?);
+// }
 
-/// Get the home configuration file
-pub fn get_home_file() -> Result<String> {
-    let config = getconfig()?;
-    let path = if let Some(homeconfig) = config.homeconfig {
-        homeconfig
-    } else {
-        String::from(format!("{}/.config/nixpkgs/home.nix", &*HOME))
-    };
-    return Ok(fs::read_to_string(path)?);
-}
+// /// Get the home configuration file
+// pub fn get_home_config_file() -> Result<String> {
+//     let config = getconfig()?;
+//     let path = if let Some(homeconfig) = config.homeconfig {
+//         homeconfig
+//     } else {
+//         String::from(format!("{}/.config/nixpkgs/home.nix", &*HOME))
+//     };
+//     return Ok(fs::read_to_string(path)?);
+// }
 
-/// Get the flake file
-pub fn get_flake_file() -> Result<String> {
-    let config = getconfig()?;
-    let path = if let Some(flake) = config.flake {
-        flake
-    } else {
-        String::from("/etc/nixos/flake.nix")
-    };
-    return Ok(fs::read_to_string(path)?);
-}
+// /// Get the flake file
+// pub fn get_flake_file() -> Result<String> {
+//     let config = getconfig()?;
+//     let path = if let Some(flake) = config.flake {
+//         flake
+//     } else {
+//         String::from("/etc/nixos/flake.nix")
+//     };
+//     return Ok(fs::read_to_string(path)?);
+// }

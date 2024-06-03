@@ -1,5 +1,5 @@
 use crate::{
-    config::configfile::get_home_file,
+    config::configfile::get_config,
     utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
     Package, PackageAttr, HOME,
 };
@@ -40,18 +40,23 @@ pub async fn list_references() -> Result<Vec<Package>> {
             },
             version: x.version.clone(),
             pname: get_pname_from_storepath(x.store.as_str(), x.version).ok(),
+            ..Default::default()
         })
         .collect())
 }
 
 // List all packages in `home.packages`
 pub fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
-    let config = get_home_file()?;
-    let system_packages = nix_editor::read::getarrvals(&config, "home.packages")?;
-    let pkgs = system_packages
+    let config = get_config()?;
+
+    let home_config = config.read_home_config_file()?;
+    let home_packages = nix_editor::read::getarrvals(&home_config, "home.packages")?;
+
+    let pkgs = home_packages
         .iter()
         .map(|x| x.strip_prefix("pkgs.").unwrap_or(x))
         .collect::<Vec<_>>();
+
     let mut stmt: rusqlite::Statement =
         db.prepare("SELECT pname, version FROM pkgs WHERE attribute = ?")?;
     let mut packages = Vec::new();
@@ -70,6 +75,7 @@ pub fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
                     None
                 },
                 pname: Some(pname),
+                ..Default::default()
             });
         }
     }

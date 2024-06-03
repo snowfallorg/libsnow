@@ -119,12 +119,16 @@ pub async fn get_latest_nixpkgs_revision() -> Result<String> {
         let version: NixosVersion = serde_json::from_str(&output)?;
 
         // 24.11.12345678.abcdefg -> 24.11
-        let release = version
+        let mut release = version
             .nixos_version
             .split(".")
             .take(2)
             .collect::<Vec<_>>()
             .join(".");
+
+        if release == "24.05" {
+            release = "unstable".to_string();
+        }
 
         let output = reqwest::Client::new()
             .get(&format!(

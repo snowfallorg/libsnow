@@ -1,22 +1,24 @@
-use std::{process::Command, fs};
 use anyhow::Result;
+use std::{fs, process::Command};
 
+pub mod config;
 pub mod homemanager;
+pub mod metadata;
 pub mod nixenv;
 pub mod nixos;
 pub mod profile;
 pub mod utils;
-pub mod config;
-pub mod metadata;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Package {
     pub attr: PackageAttr,
     pub pname: Option<String>,
     pub version: Option<String>,
+
+    pub profile_name: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PackageUpdate {
     pub attr: PackageAttr,
     pub new_version: String,
@@ -29,6 +31,23 @@ pub enum PackageAttr {
     External { url: String, attr: String },
 }
 
+impl PackageAttr {
+    pub fn to_string(&self) -> String {
+        match self {
+            PackageAttr::NixPkgs { attr } => attr.to_string(),
+            PackageAttr::External { url, attr } => format!("{}#{}", url, attr),
+        }
+    }
+}
+
+impl Default for PackageAttr {
+    fn default() -> Self {
+        PackageAttr::NixPkgs {
+            attr: String::new(),
+        }
+    }
+}
+
 pub fn get_nix_arch() -> Result<String> {
     let output = Command::new("nix")
         .arg("--experimental-features")
@@ -36,7 +55,16 @@ pub fn get_nix_arch() -> Result<String> {
         .arg("show-config")
         .output()?;
     let stdout = String::from_utf8(output.stdout)?;
-    let arch = stdout.split("\n").collect::<Vec<_>>().iter().find(|x| x.contains("system =")).unwrap().split("=").collect::<Vec<_>>()[1].trim().to_string();
+    let arch = stdout
+        .split("\n")
+        .collect::<Vec<_>>()
+        .iter()
+        .find(|x| x.contains("system ="))
+        .unwrap()
+        .split("=")
+        .collect::<Vec<_>>()[1]
+        .trim()
+        .to_string();
     Ok(arch.to_string())
 }
 
@@ -72,11 +100,34 @@ fn get_arch() -> String {
 
 lazy_static::lazy_static! {
     pub static ref NIXARCH: String = get_arch();
-    static ref CACHEDIR: String = format!("{}/.cache/libsnow", std::env::var("HOME").unwrap());
-    static ref CONFIGDIR: String = format!("{}/.config/libsnow", std::env::var("HOME").unwrap());
-    static ref CONFIG: String = format!("{}/config.json", &*CONFIGDIR);
-    static ref HOME: String = std::env::var("HOME").unwrap();
-    static ref IS_NIXOS: bool = std::path::Path::new("/etc/NIXOS").exists(); 
+    pub static ref CACHEDIR: String = format!("{}/.cache/libsnow", std::env::var("HOME").unwrap());
+    pub static ref CONFIGDIR: String = format!("{}/.config/libsnow", std::env::var("HOME").unwrap());
+    pub static ref CONFIG: String = format!("{}/config.json", &*CONFIGDIR);
+    pub static ref HOME: String = std::env::var("HOME").unwrap();
+    pub static ref IS_NIXOS: bool = std::path::Path::new("/etc/NIXOS").exists();
+    pub static ref HELPER_EXEC: String = match std::env::current_exe() {
+        Ok(mut e) => {
+            println!("{:?}", e);
+            e.pop(); // root/bin
+            println!("{:?}", e);
+
+            // e.pop(); // root/
+            // e.push("libexec"); // root/libexec
+            e.push("libsnow-helper");
+            println!("{:?}", e);
+
+            if e.is_file() {
+                log::trace!("Using helper executable path: {}", e.to_string_lossy());
+                e.to_string_lossy().to_string()
+            } else {
+                log::warn!("Could not determine helper executable path, using $PATH");
+                String::from("libsnow-helper")
+            }
+        }
+        Err(_) => {
+            log::warn!("Could not determine helper executable path, using $PATH");
+            String::from("libsnow-helper")
+        },
+    };
 }
 static SYSCONFIG: &str = "/etc/libsnow/config.json";
-
