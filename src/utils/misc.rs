@@ -103,3 +103,11 @@ pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
     }
     Ok(updatable)
 }
+
+pub fn refresh_icons() -> Result<()> {
+    let output = std::process::Command::new("/usr/share/libsnow/triggers/update-icon.trigger")
+        .output()
+        .context("Failed to run update-icon.trigger")?;
+    debug!("{}", String::from_utf8(output.stdout)?);
+    Ok(())
+}

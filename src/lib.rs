@@ -108,3 +108,4 @@ lazy_static::lazy_static! {
 }
 static SYSCONFIG: &str = "/etc/libsnow/config.json";
 static HELPER_EXEC: &str = "libsnow-helper";
+static ICON_UPDATER_EXEC: &str = "update-icons.tigger";

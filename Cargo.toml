@@ -29,6 +29,8 @@ brotli = "6.0"
 rusqlite = "0.31"
 rayon = "1.8"
 
-[workspace]
-members = [".", "libsnow-helper"]
-default-members = [".", "libsnow-helper"]
+tantivy = { version = "0.22", features = ["mmap"] }
+
+# [workspace]
+# members = [".", "libsnow-helper"]
+# default-members = [".", "libsnow-helper"]
