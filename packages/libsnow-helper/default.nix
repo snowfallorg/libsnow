@@ -4,6 +4,7 @@
 , pkg-config
 , rustc
 , rustPlatform
+, bash
 , desktop-file-utils
 , hicolor-icon-theme
 , shared-mime-info
@@ -41,6 +42,7 @@ rustPlatform.buildRustPackage rec {
     # add update-icons.trigger
     install -Dm755 ${./update-icons.trigger} $out/share/libsnow/triggers/update-icons.trigger
     substitute ${./update-icons.trigger} $out/share/libsnow/triggers/update-icons.trigger \
+      --subst-var-by bash ${bash} \
       --subst-var-by desktop-file-utils ${desktop-file-utils} \
       --subst-var-by hicolor-icon-theme ${hicolor-icon-theme} \
       --subst-var-by shared-mime-info ${shared-mime-info} \

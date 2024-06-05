@@ -106,8 +106,7 @@ pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
 
 pub fn refresh_icons() -> Result<()> {
     let output = std::process::Command::new(&*ICON_UPDATER_EXEC)
-        .output()
-        .context("Failed to run update-icon.trigger")?;
+        .output()?;
     debug!("{}", String::from_utf8(output.stdout)?);
     Ok(())
 }

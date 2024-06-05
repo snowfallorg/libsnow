@@ -1,3 +1,4 @@
+#!@bash@/bin/sh
 @desktop-file-utils@/bin/update-desktop-database -q "$HOME/.local/share/applications"
 
 cp -f @hicolor-icon-theme@/share/icons/hicolor/index.theme "$HOME/.local/share/icons/hicolor/"
