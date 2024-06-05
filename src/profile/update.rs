@@ -101,7 +101,6 @@ pub async fn update_all() -> Result<()> {
         .arg("--all")
         .status()
         .await?;
-    // let stdout = String::from_utf8(output.stdout)?;
     debug!("{}", output);
     Ok(())
 }

@@ -84,7 +84,7 @@ pub fn name_from_attr(attr: &str) -> Result<String> {
                 url,
                 attr: ext_attr,
             } => {
-                if ext_attr == format!("{}#{}", url, attr)
+                if attr == format!("{}#{}", url, ext_attr)
                     || (ext_attr.ends_with(".default") && url == attr)
                 {
                     return Ok(pkg.profile_name.context("Profile name not found")?);
