@@ -2,7 +2,7 @@ use crate::{
     profile::list::{list, name_from_attr},
     PackageAttr,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::debug;
 use tokio::process::Command;
 
@@ -24,6 +24,11 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
             println!("Package {} is not installed", pkg);
         }
     }
+
+    if pkgs_to_remove.is_empty() {
+        return Err(anyhow!("No packages to remove"));
+    }
+
     let output = Command::new("nix")
         .arg("profile")
         .arg("remove")

@@ -1,5 +1,5 @@
 use crate::{profile::list::{list, name_from_attr}, utils, PackageAttr, PackageUpdate};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::debug;
 use tokio::process::Command;
 
@@ -79,6 +79,11 @@ pub async fn update(pkgs: &[&str]) -> Result<()> {
             println!("Package {} is not installed", pkg);
         }
     }
+
+    if pkgs_to_update.is_empty() {
+        return Err(anyhow!("No packages to update"));
+    }
+
     let output = Command::new("nix")
         .arg("profile")
         .arg("upgrade")

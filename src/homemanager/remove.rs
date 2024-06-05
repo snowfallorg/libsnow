@@ -28,7 +28,7 @@ pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
     let oldconfig = config.read_home_config_file()?;
 
     if pkgs_to_remove.is_empty() {
-        return Err(anyhow!("No new packages to remove"));
+        return Err(anyhow!("No packages to remove"));
     }
 
     if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "home.packages") {

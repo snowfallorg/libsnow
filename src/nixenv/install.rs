@@ -17,6 +17,10 @@ pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
         }
     }
 
+    if pkgs_to_install.is_empty() {
+        return Err(anyhow!("No new packages to install"));
+    }
+
     let channel = get_channel()?;
     let status = Command::new("nix-env")
         .arg("-iA")

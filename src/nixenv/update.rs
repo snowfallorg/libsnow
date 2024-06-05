@@ -21,6 +21,10 @@ pub async fn update(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
         }
     }
 
+    if pkgs_to_update.is_empty() {
+        return Err(anyhow!("No packages to update"));
+    }
+
     let status = tokio::process::Command::new("nix-env")
         .arg("-uA")
         .args(pkgs.iter())

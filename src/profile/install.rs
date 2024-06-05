@@ -18,6 +18,10 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
         }
     }
 
+    if pkgs_to_install.is_empty() {
+        return Err(anyhow!("No new packages to install"));
+    }
+
     let status = Command::new("nix")
         .arg("--extra-experimental-features")
         .arg("nix-command flakes")

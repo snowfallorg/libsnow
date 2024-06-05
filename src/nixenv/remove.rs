@@ -17,6 +17,10 @@ pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
         }
     }
 
+    if pkgs_to_remove.is_empty() {
+        return Err(anyhow!("No packages to remove"));
+    }
+
     let status = Command::new("nix-env")
         .arg("--uninstall")
         .args(pkgs_to_remove.iter())
