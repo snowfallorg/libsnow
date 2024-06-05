@@ -1,6 +1,6 @@
 use crate::{
     metadata::{database::DatabaseCacheEntry, revision::get_latest_nixpkgs_revision},
-    Package, PackageAttr, PackageUpdate,
+    Package, PackageAttr, PackageUpdate, ICON_UPDATER_EXEC,
 };
 use anyhow::{Context, Result};
 use log::debug;
@@ -105,7 +105,7 @@ pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
 }
 
 pub fn refresh_icons() -> Result<()> {
-    let output = std::process::Command::new("/usr/share/libsnow/triggers/update-icon.trigger")
+    let output = std::process::Command::new(&*ICON_UPDATER_EXEC)
         .output()
         .context("Failed to run update-icon.trigger")?;
     debug!("{}", String::from_utf8(output.stdout)?);
