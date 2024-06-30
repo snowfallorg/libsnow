@@ -35,29 +35,23 @@ impl LibSnowConfig {
     }
 
     pub fn read_system_config_file(&self) -> Result<String> {
-        let path = if let Some(systemconfig) = self.systemconfig.clone() {
-            systemconfig
-        } else {
-            String::from("/etc/nixos/configuration.nix")
-        };
+        let path = self
+            .systemconfig
+            .clone()
+            .context("No system config file found")?;
         return Ok(fs::read_to_string(path)?);
     }
 
     pub fn read_home_config_file(&self) -> Result<String> {
-        let path = if let Some(homeconfig) = self.homeconfig.clone() {
-            homeconfig
-        } else {
-            String::from(format!("{}/.config/nixpkgs/home.nix", &*HOME))
-        };
+        let path = self
+            .homeconfig
+            .clone()
+            .context("No home config file found")?;
         return Ok(fs::read_to_string(path)?);
     }
 
     pub fn read_flake_file(&self) -> Result<String> {
-        let path = if let Some(flake) = self.flake.clone() {
-            flake
-        } else {
-            String::from("/etc/nixos/flake.nix")
-        };
+        let path = self.flake.clone().context("No flake file found")?;
         return Ok(fs::read_to_string(path)?);
     }
 
@@ -66,9 +60,7 @@ impl LibSnowConfig {
         if flake_file.is_dir() {
             Ok(flake_file.to_str().context("No path found")?.to_string())
         } else {
-            let flake_dir = flake_file
-                .parent()
-                .context("No parent found")?;
+            let flake_dir = flake_file.parent().context("No parent found")?;
             Ok(flake_dir.to_str().context("No path found")?.to_string())
         }
     }

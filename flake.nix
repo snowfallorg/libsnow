@@ -7,10 +7,10 @@
     };
   };
 
-  outputs = inputs:
+  outputs =
+    inputs:
     inputs.snowfall-lib.mkFlake {
       inherit inputs;
-#      alias.packages.default = "libsnow";
       alias.shells.default = "libsnow";
       src = ./.;
     };
