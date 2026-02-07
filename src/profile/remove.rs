@@ -1,8 +1,8 @@
 use crate::{
-    profile::list::{list, name_from_attr},
     PackageAttr,
+    profile::list::{list, name_from_attr},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::debug;
 use tokio::process::Command;
 

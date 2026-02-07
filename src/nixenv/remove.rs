@@ -1,10 +1,10 @@
 use super::list::list;
-use crate::PackageAttr;
-use anyhow::{anyhow, Result};
+use crate::{PackageAttr, metadata::Metadata};
+use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
-pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
-    let installed = list(db).await?;
+pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let installed = list(md).await?;
     let mut pkgs_to_remove = Vec::new();
     for pkg in pkgs {
         if let Some(Some(pname)) = installed

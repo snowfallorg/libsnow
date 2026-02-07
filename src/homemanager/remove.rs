@@ -1,20 +1,18 @@
-use crate::{config::configfile, homemanager::list::list, HELPER_EXEC};
-use anyhow::{anyhow, Context, Result};
+use crate::{HELPER_EXEC, config::configfile, homemanager::list::list, metadata::Metadata};
+use anyhow::{Context, Result, anyhow};
 use log::debug;
 use tokio::io::AsyncWriteExt;
 
-pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
-    let installed = list(db)?
+pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let installed = list(md)?
         .into_iter()
         .map(|x| x.attr.to_string())
         .collect::<Vec<_>>();
 
     // Check if the package is within nixpkgs and if it is installed
-    let mut stmt = db.prepare("SELECT pname FROM pkgs WHERE attribute = ?")?;
     let mut pkgs_to_remove = vec![];
     for pkg in pkgs {
-        let out: Result<String, _> = stmt.query_row([pkg], |row| row.get(0));
-        if let Ok(_pname) = out {
+        if md.get(pkg).is_ok() {
             if installed.contains(&pkg.to_string()) {
                 pkgs_to_remove.push(pkg.to_string());
             } else {
@@ -31,13 +29,13 @@ pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
         return Err(anyhow!("No packages to remove"));
     }
 
-    if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "home.packages") {
-        if !withvals.contains(&String::from("pkgs")) {
-            pkgs_to_remove = pkgs_to_remove
-                .iter()
-                .map(|x| format!("pkgs.{}", x))
-                .collect();
-        }
+    if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "home.packages")
+        && !withvals.contains(&String::from("pkgs"))
+    {
+        pkgs_to_remove = pkgs_to_remove
+            .iter()
+            .map(|x| format!("pkgs.{}", x))
+            .collect();
     }
 
     let newconfig = nix_editor::write::rmarr(&oldconfig, "home.packages", pkgs_to_remove)?;

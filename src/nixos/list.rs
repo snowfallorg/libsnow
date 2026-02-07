@@ -2,9 +2,10 @@ use anyhow::Result;
 use rayon::prelude::*;
 
 use crate::{
-    config::configfile::get_config,
-    utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
     Package, PackageAttr,
+    config::configfile::get_config,
+    metadata::Metadata,
+    utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
 };
 
 // curl https://api.snowflakeos.org/v0/storebatch -X POST -d '{"stores": ["x1", "x2"]}'
@@ -22,7 +23,7 @@ pub async fn list_references() -> Result<Vec<Package>> {
 
     let mut names = store_paths
         .par_iter()
-        .map(|x| x.split('/').last().unwrap_or(x))
+        .map(|x| x.split('/').next_back().unwrap_or(x))
         .collect::<Vec<_>>();
     names.sort();
 
@@ -44,7 +45,7 @@ pub async fn list_references() -> Result<Vec<Package>> {
 }
 
 // List all packages in `enviroment.systemPackages`
-pub fn list_systempackages(db: &rusqlite::Connection) -> Result<Vec<Package>> {
+pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
     let config = get_config()?;
     let system_packages = nix_editor::read::getarrvals(
         &config.read_system_config_file()?,
@@ -54,23 +55,19 @@ pub fn list_systempackages(db: &rusqlite::Connection) -> Result<Vec<Package>> {
         .iter()
         .map(|x| x.strip_prefix("pkgs.").unwrap_or(x).to_string())
         .collect::<Vec<_>>();
-    let mut stmt = db.prepare("SELECT pname, version FROM pkgs WHERE attribute = ?")?;
     let mut packages = Vec::new();
     for pkg in &pkgs {
-        let mut rows = stmt.query([pkg])?;
-        while let Some(row) = rows.next()? {
-            let pname: String = row.get(0)?;
-            let version: String = row.get(1)?;
+        if let Ok(info) = md.get(pkg) {
             packages.push(Package {
                 attr: PackageAttr::NixPkgs {
                     attr: pkg.to_string(),
                 },
-                version: if !version.is_empty() {
-                    Some(version)
+                version: if !info.version.is_empty() {
+                    Some(info.version)
                 } else {
                     None
                 },
-                pname: Some(pname),
+                pname: Some(info.pname),
                 ..Default::default()
             });
         }

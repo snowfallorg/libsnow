@@ -1,25 +1,21 @@
 use super::AuthMethod;
-use crate::{config::configfile, nixos::list::list_systempackages, HELPER_EXEC};
-use anyhow::{anyhow, Context, Result};
+use crate::{
+    HELPER_EXEC, config::configfile, metadata::Metadata, nixos::list::list_systempackages,
+};
+use anyhow::{Context, Result, anyhow};
 use log::debug;
 use tokio::io::AsyncWriteExt;
 
-pub async fn remove(
-    pkgs: &[&str],
-    db: &rusqlite::Connection,
-    auth_method: AuthMethod<'_>,
-) -> Result<()> {
-    let installed = list_systempackages(db)?
+pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
+    let installed = list_systempackages(md)?
         .into_iter()
         .map(|x| x.attr.to_string())
         .collect::<Vec<_>>();
 
     // Check if the package is within nixpkgs and if it is installed
-    let mut stmt = db.prepare("SELECT pname FROM pkgs WHERE attribute = ?")?;
     let mut pkgs_to_remove = vec![];
     for pkg in pkgs {
-        let out: Result<String, _> = stmt.query_row([pkg], |row| row.get(0));
-        if let Ok(_pname) = out {
+        if md.get(pkg).is_ok() {
             if installed.contains(&pkg.to_string()) {
                 pkgs_to_remove.push(pkg.to_string());
             } else {
@@ -36,13 +32,13 @@ pub async fn remove(
         return Err(anyhow!("No new packages to install"));
     }
 
-    if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "environment.systemPackages") {
-        if !withvals.contains(&String::from("pkgs")) {
-            pkgs_to_remove = pkgs_to_remove
-                .iter()
-                .map(|x| format!("pkgs.{}", x))
-                .collect();
-        }
+    if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "environment.systemPackages")
+        && !withvals.contains(&String::from("pkgs"))
+    {
+        pkgs_to_remove = pkgs_to_remove
+            .iter()
+            .map(|x| format!("pkgs.{}", x))
+            .collect();
     }
 
     let newconfig =

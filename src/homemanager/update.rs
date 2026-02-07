@@ -1,11 +1,12 @@
 use crate::{
-    config::configfile::get_config, homemanager::list::list, utils, PackageUpdate, HELPER_EXEC,
+    HELPER_EXEC, PackageUpdate, config::configfile::get_config, homemanager::list::list,
+    metadata::Metadata, utils,
 };
 use anyhow::Result;
 use log::debug;
 
-pub async fn updatable(db: &rusqlite::Connection) -> Result<Vec<PackageUpdate>> {
-    utils::misc::updatable(list(db)?).await
+pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
+    utils::misc::updatable(list(md)?).await
 }
 
 pub async fn update() -> Result<()> {

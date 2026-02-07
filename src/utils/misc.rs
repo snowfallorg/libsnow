@@ -1,12 +1,9 @@
-use crate::{
-    metadata::{database::DatabaseCacheEntry, revision::get_latest_nixpkgs_revision},
-    Package, PackageAttr, PackageUpdate, ICON_UPDATER_EXEC,
-};
+use crate::{ICON_UPDATER_EXEC, Package, PackageAttr, PackageUpdate, metadata::Metadata};
 use anyhow::{Context, Result};
 use log::debug;
 
 pub fn get_name_from_storepath(path: &str) -> Result<String> {
-    let name = path.split('/').last().context("No name found")?;
+    let name = path.split('/').next_back().context("No name found")?;
     let name = name.split('-').skip(1).collect::<Vec<_>>().join("-");
     Ok(name)
 }
@@ -64,37 +61,29 @@ pub fn get_version_from_storepath(path: &str, pname: &str) -> Result<String> {
 
 pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
     let mut updatable = vec![];
-    let newrev = get_latest_nixpkgs_revision().await?;
-    let newdb = rusqlite::Connection::open(
-        crate::metadata::database::fetch_database(&newrev, DatabaseCacheEntry::New).await?,
-    )?;
-    let mut stmt = newdb.prepare("SELECT pname, version FROM pkgs WHERE attribute = ?")?;
+    let new_md = Metadata::connect_latest().await?;
 
     for pkg in installed {
         match &pkg.attr {
             PackageAttr::NixPkgs { attr } => {
-                let out: Result<(String, String), _> =
-                    stmt.query_row([attr], |row| Ok((row.get(0)?, row.get(1)?)));
-                if let Ok((pname, version)) = out {
-                    if let Ok((_pname, Some(version))) =
-                        get_pname_version(&format!("{}-{}", pname, version))
-                    {
-                        debug!(
-                            "{}: {} -> {}",
-                            attr,
-                            pkg.version.clone().unwrap_or_default(),
-                            version
-                        );
-                        if version.is_empty() {
-                            continue;
-                        } else if pkg.version.is_none() || version != *pkg.version.as_ref().unwrap()
-                        {
-                            updatable.push(PackageUpdate {
-                                attr: pkg.attr.clone(),
-                                new_version: version.to_string(),
-                                old_version: pkg.version.unwrap_or_default(),
-                            });
-                        }
+                if let Ok(info) = new_md.get(attr)
+                    && let Ok((_pname, Some(version))) =
+                        get_pname_version(&format!("{}-{}", info.pname, info.version))
+                {
+                    debug!(
+                        "{}: {} -> {}",
+                        attr,
+                        pkg.version.clone().unwrap_or_default(),
+                        version
+                    );
+                    if version.is_empty() {
+                        continue;
+                    } else if pkg.version.is_none() || version != *pkg.version.as_ref().unwrap() {
+                        updatable.push(PackageUpdate {
+                            attr: pkg.attr.clone(),
+                            new_version: version.to_string(),
+                            old_version: pkg.version.unwrap_or_default(),
+                        });
                     }
                 }
             }

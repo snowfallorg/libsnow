@@ -1,10 +1,10 @@
 use super::{get_channel, list::list};
-use crate::PackageAttr;
-use anyhow::{anyhow, Result};
+use crate::{PackageAttr, metadata::Metadata};
+use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
-pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
-    let installed = list(db).await?;
+pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let installed = list(md).await?;
     let mut pkgs_to_install = Vec::new();
     for pkg in pkgs {
         if installed.iter().any(|x| match x.attr {

@@ -1,22 +1,20 @@
-use crate::{config::configfile, homemanager::list::list, HELPER_EXEC};
-use anyhow::{anyhow, Context, Result};
+use crate::{HELPER_EXEC, config::configfile, homemanager::list::list, metadata::Metadata};
+use anyhow::{Context, Result, anyhow};
 use log::debug;
 use tokio::io::AsyncWriteExt;
 
-pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
-    let installed = list(db)?
+pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let installed = list(md)?
         .into_iter()
         .map(|x| x.attr.to_string())
         .collect::<Vec<_>>();
 
     // Check if the package is within nixpkgs and if it is installed
-    let mut stmt = db.prepare("SELECT pname FROM pkgs WHERE attribute = ?")?;
     let mut pkgs_to_install = vec![];
     for pkg in pkgs {
-        let out: Result<String, _> = stmt.query_row([pkg], |row| row.get(0));
-        if let Ok(pname) = out {
-            if installed.contains(&pname) {
-                debug!("{} is already installed", pname);
+        if let Ok(info) = md.get(pkg) {
+            if installed.contains(&info.pname) {
+                debug!("{} is already installed", info.pname);
             } else {
                 pkgs_to_install.push(pkg.to_string());
             }
@@ -31,13 +29,13 @@ pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
         return Err(anyhow!("No new packages to install"));
     }
 
-    if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "home.packages") {
-        if !withvals.contains(&String::from("pkgs")) {
-            pkgs_to_install = pkgs_to_install
-                .iter()
-                .map(|x| format!("pkgs.{}", x))
-                .collect();
-        }
+    if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "home.packages")
+        && !withvals.contains(&String::from("pkgs"))
+    {
+        pkgs_to_install = pkgs_to_install
+            .iter()
+            .map(|x| format!("pkgs.{}", x))
+            .collect();
     }
 
     let newconfig = nix_editor::write::addtoarr(&oldconfig, "home.packages", pkgs_to_install)?;

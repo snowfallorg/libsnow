@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
 pub async fn run(pkg: &str, args: &[&str]) -> Result<()> {

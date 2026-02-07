@@ -1,13 +1,13 @@
 use super::AuthMethod;
 use crate::{
-    config::configfile::get_config, nixos::list::list_systempackages, utils, PackageUpdate,
-    HELPER_EXEC,
+    HELPER_EXEC, PackageUpdate, config::configfile::get_config, metadata::Metadata,
+    nixos::list::list_systempackages, utils,
 };
 use anyhow::Result;
 use log::debug;
 
-pub async fn updatable(db: &rusqlite::Connection) -> Result<Vec<PackageUpdate>> {
-    utils::misc::updatable(list_systempackages(db)?).await
+pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
+    utils::misc::updatable(list_systempackages(md)?).await
 }
 
 pub async fn update(auth_method: AuthMethod<'_>) -> Result<()> {

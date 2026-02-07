@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use super::revision::get_revision;
+use super::search::index_dir_for_db_path;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct DatabaseCache {
@@ -12,12 +12,12 @@ struct DatabaseCache {
     new_rev: String,
 }
 
-pub enum DatabaseCacheEntry {
+pub(crate) enum DatabaseCacheEntry {
     Current,
     New,
 }
 
-pub async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Result<String> {
+pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Result<String> {
     let cache_file_path = format!("{}/.cache/libsnow/cache.json", std::env::var("HOME")?);
     if !PathBuf::from(&cache_file_path).exists() {
         fs::create_dir_all(
@@ -68,40 +68,43 @@ pub async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Result<Stri
 }
 
 async fn cleanup(outpath: &str, cachejson: &DatabaseCache) -> Result<()> {
-    // Clean up old databases
-    let mut old_dbs = fs::read_dir(format!("{}/.cache/libsnow/", std::env::var("HOME")?)).await?;
-    while let Ok(Some(entry)) = old_dbs.next_entry().await {
+    // Clean up old databases and their search indexes
+    let cache_dir = format!("{}/.cache/libsnow/", std::env::var("HOME")?);
+    let mut entries = fs::read_dir(&cache_dir).await?;
+    while let Ok(Some(entry)) = entries.next_entry().await {
         let path = entry.path();
-        if path.extension().unwrap_or_default() == "db" {
-            let path_stem = path
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            if path != PathBuf::from(&outpath)
-                && path_stem != cachejson.current_rev
-                && path_stem != cachejson.new_rev
-            {
-                fs::remove_file(path).await?;
-            }
+        let ext = path
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        if ext != "db" && ext != "index" {
+            continue;
+        }
+
+        let stem = path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        // Keep entries belonging to current or new revision
+        if stem == cachejson.current_rev || stem == cachejson.new_rev {
+            continue;
+        }
+
+        // Keep the outpath itself and its sibling index
+        let outpath_pb = PathBuf::from(outpath);
+        if path == outpath_pb || path == index_dir_for_db_path(&outpath_pb) {
+            continue;
+        }
+
+        if path.is_dir() {
+            let _ = fs::remove_dir_all(&path).await;
+        } else {
+            let _ = fs::remove_file(&path).await;
         }
     }
     Ok(())
-}
-
-pub async fn database_connection() -> Result<rusqlite::Connection> {
-    let rev = get_revision().await?;
-    let path = fetch_database(&rev, DatabaseCacheEntry::Current).await?;
-    Ok(rusqlite::Connection::open(path)?)
-}
-
-pub async fn database_connection_offline() -> Result<rusqlite::Connection> {
-    let mut dbs = fs::read_dir(format!("{}/.cache/libsnow/", std::env::var("HOME")?)).await?;
-    while let Ok(Some(entry)) = dbs.next_entry().await {
-        let path = entry.path();
-        if path.extension().unwrap_or_default() == "db" {
-            return Ok(rusqlite::Connection::open(path)?);
-        }
-    }
-    Err(anyhow!("No database found"))
 }

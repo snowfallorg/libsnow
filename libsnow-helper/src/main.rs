@@ -130,7 +130,7 @@ fn main() {
                     std::process::exit(1);
                 }
             };
-        },
+        }
         SubCommands::UpdateHome {
             flake,
             generations,
@@ -164,7 +164,7 @@ fn write_file(path: &str, args: Vec<String>, generations: Option<u32>) -> Result
 
     // If the user sends a SIGINT, restore the original configuration file
     {
-        let mut signals = Signals::new(&[SIGINT]).unwrap();
+        let mut signals = Signals::new([SIGINT]).unwrap();
         let p = path.to_string();
         let b = backup.clone();
         let handle = move || {
@@ -248,7 +248,7 @@ fn write_file_home(path: &str, args: Vec<String>, generations: Option<u32>) -> R
 
     // If the user sends a SIGINT, restore the original configuration file
     {
-        let mut signals = Signals::new(&[SIGINT]).unwrap();
+        let mut signals = Signals::new([SIGINT]).unwrap();
         let p = path.to_string();
         let b = backup.clone();
         let handle = move || {
@@ -307,7 +307,10 @@ fn rebuild_home(args: Vec<String>, generations: Option<u32>) -> Result<()> {
             let mut cmd = Command::new("nix-env")
                 .arg("--delete-generations")
                 .arg("-p")
-                .arg(format!("{}/.local/state/nix/profiles/home-manager", std::env::var("HOME")?))
+                .arg(format!(
+                    "{}/.local/state/nix/profiles/home-manager",
+                    std::env::var("HOME")?
+                ))
                 .arg(&format!("+{}", g))
                 .spawn()?;
             let x = cmd.wait()?;

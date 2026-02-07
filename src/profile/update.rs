@@ -1,8 +1,9 @@
 use crate::{
+    PackageAttr, PackageUpdate,
     profile::list::{list, name_from_attr},
-    utils, PackageAttr, PackageUpdate,
+    utils,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::debug;
 use tokio::process::Command;
 
@@ -20,7 +21,7 @@ pub async fn updatable_all() -> Result<Vec<PackageUpdate>> {
             PackageAttr::NixPkgs { attr } => {
                 let output = Command::new("nix")
                     .arg("eval")
-                    .arg(&format!("nixpkgs#{}.version", attr))
+                    .arg(format!("nixpkgs#{}.version", attr))
                     .arg("--raw")
                     .output()
                     .await;
@@ -42,7 +43,7 @@ pub async fn updatable_all() -> Result<Vec<PackageUpdate>> {
             PackageAttr::External { url, attr } => {
                 let output = Command::new("nix")
                     .arg("eval")
-                    .arg(&format!("{}#{}.version", url, attr))
+                    .arg(format!("{}#{}.version", url, attr))
                     .arg("--raw")
                     .output()
                     .await;

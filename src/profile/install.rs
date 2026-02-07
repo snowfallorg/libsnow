@@ -1,5 +1,5 @@
-use crate::{profile::list::list, PackageAttr};
-use anyhow::{anyhow, Result};
+use crate::{PackageAttr, profile::list::list};
+use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
 pub async fn install(pkgs: &[&str]) -> Result<()> {

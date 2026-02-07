@@ -1,4 +1,4 @@
-use crate::{utils::misc::get_pname_version_from_storepath, Package, PackageAttr, NIXARCH};
+use crate::{NIXARCH, Package, PackageAttr, utils::misc::get_pname_version_from_storepath};
 use anyhow::{Context, Result};
 use log::debug;
 use serde::Deserialize;

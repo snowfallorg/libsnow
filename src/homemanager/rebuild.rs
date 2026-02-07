@@ -1,4 +1,4 @@
-use crate::{config::configfile::get_config, HELPER_EXEC};
+use crate::{HELPER_EXEC, config::configfile::get_config};
 use anyhow::Result;
 use log::debug;
 

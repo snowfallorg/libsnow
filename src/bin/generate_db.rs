@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::process::Command;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use libsnow::metadata::{build_search_index_in_dir, index_dir_for_db_path};
 use log::info;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -27,13 +27,13 @@ struct Args {
     #[arg(short, long, default_value = ".")]
     output: String,
 
-    /// Compress the database with brotli and remove the uncompressed file
-    #[arg(long)]
-    brotli: bool,
-
     /// Verbose logging
     #[arg(short, long)]
     verbose: bool,
+
+    /// Also generate a persisted Tantivy search index next to the .db file
+    #[arg(long)]
+    with_index: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -123,7 +123,7 @@ async fn resolve_latest_release(channel: &str) -> Result<String> {
         .key
         .trim_matches('/')
         .split('/')
-        .last()
+        .next_back()
         .context("Invalid key format")?
         .to_string();
 
@@ -267,14 +267,25 @@ fn create_database(packages: &HashMap<String, Package>, db_path: &str) -> Result
     Ok(())
 }
 
+fn create_search_index(db_path: &str) -> Result<()> {
+    let conn = Connection::open(db_path)?;
+    let index_dir = index_dir_for_db_path(std::path::Path::new(db_path));
+    build_search_index_in_dir(&conn, &index_dir)?;
+    info!("Search index written to {}", index_dir.display());
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
     if args.verbose {
-        std::env::set_var("RUST_LOG", "generate_db=debug,info");
+        let mut logger = pretty_env_logger::formatted_timed_builder();
+        logger.parse_filters("generate_db=debug,info");
+        logger.try_init()?;
+    } else {
+        pretty_env_logger::try_init()?;
     }
-    pretty_env_logger::init();
 
     let channel = &args.channel;
 
@@ -304,18 +315,12 @@ async fn main() -> Result<()> {
     // Build the database
     let db_path = format!("{}/{}.db", args.output, git_rev);
     create_database(&packages, &db_path)?;
-
-    if args.brotli {
-        info!("Compressing with brotli ...");
-        let status = Command::new("brotli").arg("--rm").arg(&db_path).status()?;
-        if !status.success() {
-            anyhow::bail!("brotli compression failed");
-        }
-        let compressed = format!("{}.br", db_path);
-        eprintln!("{}", compressed);
-    } else {
-        eprintln!("{}", db_path);
+    if args.with_index {
+        info!("Building search index ...");
+        create_search_index(&db_path)?;
     }
+
+    eprintln!("{}", db_path);
 
     Ok(())
 }

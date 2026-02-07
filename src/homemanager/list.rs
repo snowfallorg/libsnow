@@ -1,7 +1,8 @@
 use crate::{
+    HOME, Package, PackageAttr,
     config::configfile::get_config,
+    metadata::Metadata,
     utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
-    Package, PackageAttr, HOME,
 };
 use anyhow::Result;
 use rayon::prelude::*;
@@ -11,7 +12,7 @@ pub async fn list_references() -> Result<Vec<Package>> {
     let output = std::process::Command::new("nix-store")
         .arg("--query")
         .arg("--references")
-        .arg(&format!(
+        .arg(format!(
             "{}/.local/state/home-manager/gcroots/current-home/home-path",
             &*HOME
         ))
@@ -24,7 +25,7 @@ pub async fn list_references() -> Result<Vec<Package>> {
 
     let mut names = store_paths
         .par_iter()
-        .map(|x| x.split('/').last().unwrap_or(x))
+        .map(|x| x.split('/').next_back().unwrap_or(x))
         .collect::<Vec<_>>();
     names.sort();
 
@@ -46,7 +47,7 @@ pub async fn list_references() -> Result<Vec<Package>> {
 }
 
 // List all packages in `home.packages`
-pub fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
+pub fn list(md: &Metadata) -> Result<Vec<Package>> {
     let config = get_config()?;
 
     let home_config = config.read_home_config_file()?;
@@ -57,24 +58,19 @@ pub fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
         .map(|x| x.strip_prefix("pkgs.").unwrap_or(x))
         .collect::<Vec<_>>();
 
-    let mut stmt: rusqlite::Statement =
-        db.prepare("SELECT pname, version FROM pkgs WHERE attribute = ?")?;
     let mut packages = Vec::new();
     for pkg in &pkgs {
-        let mut rows = stmt.query([pkg])?;
-        while let Some(row) = rows.next()? {
-            let pname: String = row.get(0)?;
-            let version: String = row.get(1)?;
+        if let Ok(info) = md.get(pkg) {
             packages.push(Package {
                 attr: PackageAttr::NixPkgs {
                     attr: pkg.to_string(),
                 },
-                version: if !version.is_empty() {
-                    Some(version)
+                version: if !info.version.is_empty() {
+                    Some(info.version)
                 } else {
                     None
                 },
-                pname: Some(pname),
+                pname: Some(info.pname),
                 ..Default::default()
             });
         }

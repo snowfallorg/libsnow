@@ -4,8 +4,9 @@ use anyhow::Result;
 use serde::Deserialize;
 
 use crate::{
-    utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
     Package, PackageAttr,
+    metadata::Metadata,
+    utils::{misc::get_pname_from_storepath, storedb::get_storebatch},
 };
 
 #[derive(Debug, Deserialize, Clone)]
@@ -19,7 +20,7 @@ struct EnvOutput {
     out: String,
 }
 
-pub async fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
+pub async fn list(md: &Metadata) -> Result<Vec<Package>> {
     let output = std::process::Command::new("nix-env")
         .arg("-q")
         .arg("--out-path")
@@ -29,27 +30,25 @@ pub async fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
     let stdout = String::from_utf8(output.stdout)?;
     let packages: HashMap<String, EnvPackage> = serde_json::from_str(&stdout)?;
 
-    let mut stmt = db.prepare("SELECT attribute, version FROM pkgs WHERE pname = ?")?;
-
     let mut pkgs = Vec::new();
 
     for (_name, pkg) in packages {
-        let mut rows = stmt.query([&pkg.pname])?;
-        let push;
-        if let Ok(Some(row)) = rows.next() {
-            push = Some(Package {
-                attr: PackageAttr::NixPkgs { attr: row.get(0)? },
-                version: row.get(1)?,
+        let matches = md.get_by_pname(&pkg.pname)?;
+        // Only include the package if there's exactly one match (unambiguous)
+        if matches.len() == 1 {
+            let info = &matches[0];
+            pkgs.push(Package {
+                attr: PackageAttr::NixPkgs {
+                    attr: info.attribute.clone(),
+                },
+                version: if info.version.is_empty() {
+                    None
+                } else {
+                    Some(info.version.clone())
+                },
                 pname: Some(pkg.pname),
                 ..Default::default()
             });
-        } else {
-            continue;
-        }
-        if let Ok(None) = rows.next() {
-            if let Some(push) = push {
-                pkgs.push(push);
-            }
         }
     }
 
@@ -67,7 +66,13 @@ pub async fn list_accurate() -> Result<Vec<Package>> {
     let packages: HashMap<String, EnvPackage> = serde_json::from_str(&stdout)?;
     let paths = packages
         .values()
-        .map(|x| x.outputs.out.split('/').last().unwrap_or(&x.outputs.out))
+        .map(|x| {
+            x.outputs
+                .out
+                .split('/')
+                .next_back()
+                .unwrap_or(&x.outputs.out)
+        })
         .collect::<Vec<_>>();
 
     let storebatch = get_storebatch(paths.iter().map(AsRef::as_ref).collect()).await?;

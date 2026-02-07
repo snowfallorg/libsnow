@@ -1,12 +1,13 @@
 use super::get_channel;
-use crate::{nixenv::list::list, utils, PackageUpdate};
-use anyhow::{anyhow, Result};
-pub async fn updatable(db: &rusqlite::Connection) -> Result<Vec<PackageUpdate>> {
-    utils::misc::updatable(list(db).await?).await
+use crate::{PackageUpdate, metadata::Metadata, nixenv::list::list, utils};
+use anyhow::{Result, anyhow};
+
+pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
+    utils::misc::updatable(list(md).await?).await
 }
 
-pub async fn update(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
-    let list = list(db)
+pub async fn update(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let list = list(md)
         .await?
         .into_iter()
         .map(|x| x.attr.to_string())
