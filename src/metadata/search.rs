@@ -2,7 +2,11 @@ use anyhow::Result;
 use log::debug;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
-use tantivy::{query::QueryParser, schema::{IndexRecordOption, Schema, TextFieldIndexing, TextOptions, FAST, STORED, STRING, TEXT}, tokenizer::{SimpleTokenizer, TokenFilter}, DocId, Document, Index, Score, Searcher, SegmentReader, TantivyDocument};
+use tantivy::{
+    query::QueryParser,
+    schema::{IndexRecordOption, Schema, TextFieldIndexing, TextOptions, STORED},
+    Document, Index, Searcher, TantivyDocument,
+};
 
 pub struct DbSearcher {
     searcher: Searcher,
@@ -48,9 +52,11 @@ where
                     Ok(None)
                 }
             } else {
-                Err(serde::de::Error::custom("Expected an array with one element"))
+                Err(serde::de::Error::custom(
+                    "Expected an array with one element",
+                ))
             }
-        },
+        }
         _ => Err(serde::de::Error::custom("Expected an array")),
     }
 }
@@ -69,9 +75,11 @@ where
                     Err(serde::de::Error::custom("Expected a string"))
                 }
             } else {
-                Err(serde::de::Error::custom("Expected an array with one element"))
+                Err(serde::de::Error::custom(
+                    "Expected an array with one element",
+                ))
             }
-        },
+        }
         _ => Err(serde::de::Error::custom("Expected an array")),
     }
 }
@@ -90,15 +98,17 @@ where
                     Ok(false)
                 }
             } else {
-                Err(serde::de::Error::custom("Expected an array with one element"))
+                Err(serde::de::Error::custom(
+                    "Expected an array with one element",
+                ))
             }
-        },
+        }
         _ => Err(serde::de::Error::custom("Expected an array")),
     }
 }
 
 #[derive(Debug)]
-pub struct SearchQuery <'a> {
+pub struct SearchQuery<'a> {
     pub query: &'a str,
     pub limit: usize,
     pub score_threshold: f32,
@@ -115,16 +125,14 @@ impl<'a> Default for SearchQuery<'a> {
 }
 
 pub fn get_searcher(db: &rusqlite::Connection) -> Result<DbSearcher> {
-
     let text_field_indexing = TextFieldIndexing::default()
         .set_tokenizer("ngram3")
         .set_index_option(IndexRecordOption::WithFreqsAndPositions);
-    let text_options = TextOptions::default()
-        .set_indexing_options(text_field_indexing);
+    let text_options = TextOptions::default().set_indexing_options(text_field_indexing);
 
     // Create a Tantivy schema
     let mut schema_builder = Schema::builder();
-    let attribute = schema_builder.add_text_field("attribute", text_options.clone() | STORED );
+    let attribute = schema_builder.add_text_field("attribute", text_options.clone() | STORED);
     let version = schema_builder.add_text_field("version", STORED);
     let pname = schema_builder.add_text_field("pname", text_options.clone() | STORED);
     let description = schema_builder.add_text_field("description", text_options.clone() | STORED);
@@ -137,9 +145,10 @@ pub fn get_searcher(db: &rusqlite::Connection) -> Result<DbSearcher> {
 
     // Create an index in a temporary directory
     let index = Index::create_in_ram(schema.clone());
-    index
-        .tokenizers()
-        .register("ngram3", tantivy::tokenizer::NgramTokenizer::new(3, 3, false)?);
+    index.tokenizers().register(
+        "ngram3",
+        tantivy::tokenizer::NgramTokenizer::new(3, 3, false)?,
+    );
 
     let mut index_writer = index.writer(50_000_000)?;
 
@@ -176,13 +185,13 @@ pub fn get_searcher(db: &rusqlite::Connection) -> Result<DbSearcher> {
             doc.add_text(long_description, &ld);
         }
         if let Ok(Some(b)) = brk {
-            doc.add_text(broken, &b);
+            doc.add_text(broken, b);
         }
         if let Ok(Some(i)) = insec {
-            doc.add_text(insecure, &i);
+            doc.add_text(insecure, i);
         }
         if let Ok(Some(u)) = unfr {
-            doc.add_text(unfree, &u);
+            doc.add_text(unfree, u);
         }
         index_writer.add_document(doc)?;
     }
@@ -202,9 +211,13 @@ pub fn get_searcher(db: &rusqlite::Connection) -> Result<DbSearcher> {
 }
 
 pub fn search(sq: &SearchQuery, dbsearcher: &DbSearcher) -> Result<Vec<SearchResult>> {
-    let DbSearcher { searcher, schema, query_parser } = dbsearcher;
+    let DbSearcher {
+        searcher,
+        schema,
+        query_parser,
+    } = dbsearcher;
 
-    let (query, _) = query_parser.parse_query_lenient(&sq.query.trim());
+    let (query, _) = query_parser.parse_query_lenient(sq.query.trim());
     let top_docs: Vec<(f32, tantivy::DocAddress)> =
         searcher.search(&query, &tantivy::collector::TopDocs::with_limit(sq.limit))?;
 
@@ -215,8 +228,8 @@ pub fn search(sq: &SearchQuery, dbsearcher: &DbSearcher) -> Result<Vec<SearchRes
             break;
         }
         let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
-        debug!("Search result: {}", retrieved_doc.to_json(&schema));
-        let search_result: SearchResult = serde_json::from_str(&retrieved_doc.to_json(&schema))?;
+        debug!("Search result: {}", retrieved_doc.to_json(schema));
+        let search_result: SearchResult = serde_json::from_str(&retrieved_doc.to_json(schema))?;
         results.push(SearchResult {
             score,
             ..search_result

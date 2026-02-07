@@ -10,7 +10,7 @@ pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
         AuthMethod::Sudo => "sudo",
         AuthMethod::Custom(cmd) => cmd,
     })
-    .arg(&*HELPER_EXEC)
+    .arg(HELPER_EXEC)
     .arg("rebuild")
     .args(if let Some(generations) = config.get_generation_count() {
         vec!["--generations".to_string(), generations.to_string()]

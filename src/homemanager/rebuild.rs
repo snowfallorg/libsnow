@@ -4,7 +4,7 @@ use log::debug;
 
 pub async fn rebuild() -> Result<()> {
     let config = get_config()?;
-    let output = tokio::process::Command::new(&*HELPER_EXEC)
+    let output = tokio::process::Command::new(HELPER_EXEC)
         .arg("rebuild-home")
         .args(if let Some(generations) = config.get_generation_count() {
             vec!["--generations".to_string(), generations.to_string()]

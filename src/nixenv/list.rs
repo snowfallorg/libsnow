@@ -34,8 +34,8 @@ pub async fn list(db: &rusqlite::Connection) -> Result<Vec<Package>> {
     let mut pkgs = Vec::new();
 
     for (_name, pkg) in packages {
-        let mut rows = stmt.query(&[&pkg.pname])?;
-        let push;  
+        let mut rows = stmt.query([&pkg.pname])?;
+        let push;
         if let Ok(Some(row)) = rows.next() {
             push = Some(Package {
                 attr: PackageAttr::NixPkgs { attr: row.get(0)? },

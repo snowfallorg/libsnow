@@ -18,7 +18,7 @@ pub async fn remove(
     let mut stmt = db.prepare("SELECT pname FROM pkgs WHERE attribute = ?")?;
     let mut pkgs_to_remove = vec![];
     for pkg in pkgs {
-        let out: Result<String, _> = stmt.query_row(&[pkg], |row| Ok(row.get(0)?));
+        let out: Result<String, _> = stmt.query_row([pkg], |row| row.get(0));
         if let Ok(_pname) = out {
             if installed.contains(&pkg.to_string()) {
                 pkgs_to_remove.push(pkg.to_string());
@@ -53,7 +53,7 @@ pub async fn remove(
         AuthMethod::Sudo => "sudo",
         AuthMethod::Custom(cmd) => cmd,
     })
-    .arg(&*HELPER_EXEC)
+    .arg(HELPER_EXEC)
     .arg("config")
     .arg("--output")
     .arg(

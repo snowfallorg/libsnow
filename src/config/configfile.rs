@@ -39,7 +39,7 @@ impl LibSnowConfig {
             .systemconfig
             .clone()
             .context("No system config file found")?;
-        return Ok(fs::read_to_string(path)?);
+        Ok(fs::read_to_string(path)?)
     }
 
     pub fn read_home_config_file(&self) -> Result<String> {
@@ -47,12 +47,12 @@ impl LibSnowConfig {
             .homeconfig
             .clone()
             .context("No home config file found")?;
-        return Ok(fs::read_to_string(path)?);
+        Ok(fs::read_to_string(path)?)
     }
 
     pub fn read_flake_file(&self) -> Result<String> {
         let path = self.flake.clone().context("No flake file found")?;
-        return Ok(fs::read_to_string(path)?);
+        Ok(fs::read_to_string(path)?)
     }
 
     pub fn get_flake_dir(&self) -> Result<String> {
@@ -66,11 +66,7 @@ impl LibSnowConfig {
     }
 
     pub fn get_generation_count(&self) -> Option<u32> {
-        if let Some(generations) = self.generations {
-            Some(generations)
-        } else {
-            None
-        }
+        self.generations
     }
 }
 
@@ -104,17 +100,17 @@ pub fn get_config() -> Result<LibSnowConfig> {
 
 /// Get the use package type
 pub fn get_user_pkg_type() -> UserPkgType {
-    let userpkgtype = if Path::new(&format!("{}/.nix-profile/manifest.json", &*HOME)).exists()
+    if Path::new(&format!("{}/.nix-profile/manifest.json", &*HOME)).exists()
         || !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos").exists()
         || !Path::new(&format!("{}/.nix-profile/manifest.nix", &*HOME)).exists()
-        || if let Ok(m) = fs::read_to_string(&format!("{}/.nix-profile/manifest.nix", &*HOME)) {
+        || if let Ok(m) = fs::read_to_string(format!("{}/.nix-profile/manifest.nix", &*HOME)) {
             m == "[ ]"
         } else {
             false
-        } {
+        }
+    {
         UserPkgType::Profile
     } else {
         UserPkgType::Env
-    };
-    return userpkgtype;
+    }
 }

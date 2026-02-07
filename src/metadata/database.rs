@@ -20,7 +20,12 @@ pub enum DatabaseCacheEntry {
 pub async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Result<String> {
     let cache_file_path = format!("{}/.cache/libsnow/cache.json", std::env::var("HOME")?);
     if !PathBuf::from(&cache_file_path).exists() {
-        fs::create_dir_all(PathBuf::from(&cache_file_path).parent().context("Invalid path")?).await?;
+        fs::create_dir_all(
+            PathBuf::from(&cache_file_path)
+                .parent()
+                .context("Invalid path")?,
+        )
+        .await?;
         fs::write(&cache_file_path, r#"{"current_rev": "", "new_rev": ""}"#).await?;
     }
     let cache_content = fs::read_to_string(&cache_file_path).await?;

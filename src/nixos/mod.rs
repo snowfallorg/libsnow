@@ -1,10 +1,10 @@
-pub mod list;
-pub mod update;
 pub mod install;
-pub mod remove;
+pub mod list;
 pub mod rebuild;
+pub mod remove;
+pub mod update;
 
-pub enum AuthMethod <'a> {
+pub enum AuthMethod<'a> {
     Pkexec,
     Sudo,
     Custom(&'a str),

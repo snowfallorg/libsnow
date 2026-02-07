@@ -24,8 +24,7 @@ impl BatchStoreResponse {
     pub fn get_attributes(&self) -> Vec<String> {
         self.packages
             .iter()
-            .map(|x| x.attribute.to_vec())
-            .flatten()
+            .flat_map(|x| x.attribute.to_vec())
             .collect()
     }
 }

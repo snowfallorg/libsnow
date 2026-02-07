@@ -7,10 +7,14 @@ pub async fn remove(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
     let installed = list(db).await?;
     let mut pkgs_to_remove = Vec::new();
     for pkg in pkgs {
-        if let Some(Some(pname)) = installed.iter().find(|x| match x.attr {
-            PackageAttr::NixPkgs { ref attr } => attr == pkg,
-            _ => false,
-        }).map(|x| x.pname.clone()) {
+        if let Some(Some(pname)) = installed
+            .iter()
+            .find(|x| match x.attr {
+                PackageAttr::NixPkgs { ref attr } => attr == pkg,
+                _ => false,
+            })
+            .map(|x| x.pname.clone())
+        {
             pkgs_to_remove.push(pname);
         } else {
             println!("Package {} is not installed", pkg);

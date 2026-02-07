@@ -16,13 +16,13 @@ pub async fn list_references() -> Result<Vec<Package>> {
         .output()?;
     let stdout = String::from_utf8(output.stdout)?;
     let store_paths = stdout
-        .split("\n")
+        .split('\n')
         .filter(|x| !x.is_empty())
         .collect::<Vec<_>>();
 
     let mut names = store_paths
         .par_iter()
-        .map(|x| x.split('/').last().unwrap_or(&x))
+        .map(|x| x.split('/').last().unwrap_or(x))
         .collect::<Vec<_>>();
     names.sort();
 
@@ -57,7 +57,7 @@ pub fn list_systempackages(db: &rusqlite::Connection) -> Result<Vec<Package>> {
     let mut stmt = db.prepare("SELECT pname, version FROM pkgs WHERE attribute = ?")?;
     let mut packages = Vec::new();
     for pkg in &pkgs {
-        let mut rows = stmt.query(&[pkg])?;
+        let mut rows = stmt.query([pkg])?;
         while let Some(row) = rows.next()? {
             let pname: String = row.get(0)?;
             let version: String = row.get(1)?;

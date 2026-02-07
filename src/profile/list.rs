@@ -50,7 +50,7 @@ pub fn list() -> Result<Vec<Package>> {
                     attr: PackageAttr::NixPkgs {
                         attr: pkgattr.to_string(),
                     },
-                    version: version,
+                    version,
                     pname: Some(pname),
                     profile_name: Some(profile_name),
                 });
@@ -60,7 +60,7 @@ pub fn list() -> Result<Vec<Package>> {
                         url: originalurl,
                         attr: attrpath,
                     },
-                    version: version,
+                    version,
                     pname: Some(pname),
                     profile_name: Some(profile_name),
                 });
@@ -68,7 +68,7 @@ pub fn list() -> Result<Vec<Package>> {
         }
     }
 
-    return Ok(pkgs);
+    Ok(pkgs)
 }
 
 pub fn name_from_attr(attr: &str) -> Result<String> {
@@ -77,7 +77,7 @@ pub fn name_from_attr(attr: &str) -> Result<String> {
         match pkg.attr {
             PackageAttr::NixPkgs { attr: x } => {
                 if x == attr {
-                    return Ok(pkg.profile_name.context("Profile name not found")?);
+                    return pkg.profile_name.context("Profile name not found");
                 }
             }
             PackageAttr::External {
@@ -87,10 +87,10 @@ pub fn name_from_attr(attr: &str) -> Result<String> {
                 if attr == format!("{}#{}", url, ext_attr)
                     || (ext_attr.ends_with(".default") && url == attr)
                 {
-                    return Ok(pkg.profile_name.context("Profile name not found")?);
+                    return pkg.profile_name.context("Profile name not found");
                 }
             }
         }
     }
-    return Err(anyhow::anyhow!("Package not found"));
+    Err(anyhow::anyhow!("Package not found"))
 }

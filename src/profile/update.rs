@@ -1,8 +1,10 @@
-use crate::{profile::list::{list, name_from_attr}, utils, PackageAttr, PackageUpdate};
+use crate::{
+    profile::list::{list, name_from_attr},
+    utils, PackageAttr, PackageUpdate,
+};
 use anyhow::{anyhow, Result};
 use log::debug;
 use tokio::process::Command;
-
 
 pub async fn updatable() -> Result<Vec<PackageUpdate>> {
     utils::misc::updatable(list()?).await

@@ -22,7 +22,7 @@ pub async fn get_revision() -> Result<String> {
         let output = Command::new("nixos-version").arg("--json").output().await?;
         let output = String::from_utf8(output.stdout)?;
         let version: NixosVersion = serde_json::from_str(&output)?;
-        return Ok(version.nixpkgs_revision);
+        Ok(version.nixpkgs_revision)
     } else {
         let output = Command::new("nix")
             .arg("registry")
@@ -30,13 +30,13 @@ pub async fn get_revision() -> Result<String> {
             .output()
             .await?;
         let output = String::from_utf8(output.stdout)?;
-        let lines = output.split("\n").collect::<Vec<_>>();
+        let lines = output.split('\n').collect::<Vec<_>>();
         let line = lines
             .iter()
             .find(|x| x.contains("global flake:nixpkgs"))
             .context("No nixpkgs flake found")?;
         let path = line
-            .split(" ")
+            .split(' ')
             .collect::<Vec<_>>()
             .get(2)
             .context("Invalid registry entry")?
@@ -44,10 +44,10 @@ pub async fn get_revision() -> Result<String> {
 
         match path {
             x if x.starts_with("github:NixOS/nixpkgs/") => {
-                let parts = x.split("/").collect::<Vec<_>>();
+                let parts = x.split('/').collect::<Vec<_>>();
                 let channel = parts.last().context("Invalid github path")?;
                 let output = reqwest::Client::new()
-                    .get(&format!(
+                    .get(format!(
                         "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
                         channel
                     ))
@@ -70,13 +70,13 @@ pub async fn get_profile_revision() -> Result<String> {
         .output()
         .await?;
     let output = String::from_utf8(output.stdout)?;
-    let lines = output.split("\n").collect::<Vec<_>>();
+    let lines = output.split('\n').collect::<Vec<_>>();
     let line = lines
         .iter()
         .find(|x| x.contains("global flake:nixpkgs") || x.contains("system flake:nixpkgs"))
         .context("No nixpkgs flake found")?;
     let path = line
-        .split(" ")
+        .split(' ')
         .collect::<Vec<_>>()
         .get(2)
         .context("Invalid registry entry")?
@@ -84,10 +84,10 @@ pub async fn get_profile_revision() -> Result<String> {
 
     match path {
         x if x.starts_with("github:NixOS/nixpkgs/") => {
-            let parts = x.split("/").collect::<Vec<_>>();
+            let parts = x.split('/').collect::<Vec<_>>();
             let channel = parts.last().context("Invalid github path")?;
             let output = reqwest::Client::new()
-                .get(&format!(
+                .get(format!(
                     "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
                     channel
                 ))
@@ -99,10 +99,10 @@ pub async fn get_profile_revision() -> Result<String> {
             Ok(output.sha)
         }
         x if x.starts_with("path:/nix/store/") => Ok(x
-            .split("&")
+            .split('&')
             .find(|x| x.starts_with("rev="))
             .context("No rev found")?
-            .split("=")
+            .split('=')
             .collect::<Vec<_>>()
             .get(1)
             .context("Invalid rev")?
@@ -121,7 +121,7 @@ pub async fn get_latest_nixpkgs_revision() -> Result<String> {
         // 24.11.12345678.abcdefg -> 24.11
         let mut release = version
             .nixos_version
-            .split(".")
+            .split('.')
             .take(2)
             .collect::<Vec<_>>()
             .join(".");
@@ -131,9 +131,9 @@ pub async fn get_latest_nixpkgs_revision() -> Result<String> {
         }
 
         let output = reqwest::Client::new()
-            .get(&format!(
-                "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
-                format!("nixos-{}", release)
+            .get(format!(
+                "https://api.github.com/repos/NixOS/nixpkgs/commits/nixos-{}",
+                release
             ))
             .header(reqwest::header::USER_AGENT, "libsnow")
             .send()
@@ -144,10 +144,7 @@ pub async fn get_latest_nixpkgs_revision() -> Result<String> {
             Ok(output.sha)
         } else {
             let output = reqwest::Client::new()
-                .get(&format!(
-                    "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
-                    "nixos-unstable"
-                ))
+                .get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixos-unstable")
                 .header(reqwest::header::USER_AGENT, "libsnow")
                 .send()
                 .await?;
@@ -156,10 +153,7 @@ pub async fn get_latest_nixpkgs_revision() -> Result<String> {
         }
     } else {
         let output = reqwest::Client::new()
-            .get(&format!(
-                "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
-                "nixpkgs-unstable"
-            ))
+            .get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixpkgs-unstable")
             .header(reqwest::header::USER_AGENT, "libsnow")
             .send()
             .await?;

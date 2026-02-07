@@ -13,7 +13,7 @@ pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
     let mut stmt = db.prepare("SELECT pname FROM pkgs WHERE attribute = ?")?;
     let mut pkgs_to_install = vec![];
     for pkg in pkgs {
-        let out: Result<String, _> = stmt.query_row(&[pkg], |row| Ok(row.get(0)?));
+        let out: Result<String, _> = stmt.query_row([pkg], |row| row.get(0));
         if let Ok(pname) = out {
             if installed.contains(&pname) {
                 debug!("{} is already installed", pname);
@@ -42,7 +42,7 @@ pub async fn install(pkgs: &[&str], db: &rusqlite::Connection) -> Result<()> {
 
     let newconfig = nix_editor::write::addtoarr(&oldconfig, "home.packages", pkgs_to_install)?;
 
-    let mut output = tokio::process::Command::new(&*HELPER_EXEC)
+    let mut output = tokio::process::Command::new(HELPER_EXEC)
         .arg("config-home")
         .arg("--output")
         .arg(

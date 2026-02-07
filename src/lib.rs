@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{fs, process::Command};
+use std::{fmt, fs, process::Command};
 
 pub mod config;
 pub mod homemanager;
@@ -31,11 +31,11 @@ pub enum PackageAttr {
     External { url: String, attr: String },
 }
 
-impl PackageAttr {
-    pub fn to_string(&self) -> String {
+impl fmt::Display for PackageAttr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PackageAttr::NixPkgs { attr } => attr.to_string(),
-            PackageAttr::External { url, attr } => format!("{}#{}", url, attr),
+            PackageAttr::NixPkgs { attr } => write!(f, "{}", attr),
+            PackageAttr::External { url, attr } => write!(f, "{}#{}", url, attr),
         }
     }
 }
@@ -56,21 +56,21 @@ pub fn get_nix_arch() -> Result<String> {
         .output()?;
     let stdout = String::from_utf8(output.stdout)?;
     let arch = stdout
-        .split("\n")
+        .split('\n')
         .collect::<Vec<_>>()
         .iter()
         .find(|x| x.contains("system ="))
         .unwrap()
-        .split("=")
+        .split('=')
         .collect::<Vec<_>>()[1]
         .trim()
         .to_string();
-    Ok(arch.to_string())
+    Ok(arch)
 }
 
 pub fn get_nixos_arch() -> Result<String> {
     let output = fs::read_to_string("/run/current-system/system")?;
-    return Ok(output);
+    Ok(output)
 }
 
 pub fn get_eval_arch() -> Result<String> {
@@ -82,7 +82,7 @@ pub fn get_eval_arch() -> Result<String> {
         .arg("--raw")
         .output()?;
     let stdout = String::from_utf8(output.stdout)?;
-    Ok(stdout.to_string())
+    Ok(stdout)
 }
 
 fn get_arch() -> String {

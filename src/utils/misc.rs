@@ -6,13 +6,13 @@ use anyhow::{Context, Result};
 use log::debug;
 
 pub fn get_name_from_storepath(path: &str) -> Result<String> {
-    let name = path.split("/").last().context("No name found")?;
-    let name = name.split("-").skip(1).collect::<Vec<_>>().join("-");
+    let name = path.split('/').last().context("No name found")?;
+    let name = name.split('-').skip(1).collect::<Vec<_>>().join("-");
     Ok(name)
 }
 
 fn get_pname_version(name: &str) -> Result<(String, Option<String>)> {
-    let parts: std::str::Split<&str> = name.split("-");
+    let parts: std::str::Split<char> = name.split('-');
     let index = parts
         .clone()
         .enumerate()
@@ -74,7 +74,7 @@ pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
         match &pkg.attr {
             PackageAttr::NixPkgs { attr } => {
                 let out: Result<(String, String), _> =
-                    stmt.query_row(&[attr], |row| Ok((row.get(0)?, row.get(1)?)));
+                    stmt.query_row([attr], |row| Ok((row.get(0)?, row.get(1)?)));
                 if let Ok((pname, version)) = out {
                     if let Ok((_pname, Some(version))) =
                         get_pname_version(&format!("{}-{}", pname, version))
@@ -105,8 +105,7 @@ pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
 }
 
 pub fn refresh_icons() -> Result<()> {
-    let output = std::process::Command::new(&*ICON_UPDATER_EXEC)
-        .output()?;
+    let output = std::process::Command::new(ICON_UPDATER_EXEC).output()?;
     debug!("{}", String::from_utf8(output.stdout)?);
     Ok(())
 }
