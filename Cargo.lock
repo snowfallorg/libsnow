@@ -999,11 +999,13 @@ version = "0.0.1-alpha.2"
 dependencies = [
  "anyhow",
  "brotli",
+ "clap 4.5.4",
  "csv",
  "lazy_static",
  "log",
  "nix-editor",
  "pretty_env_logger",
+ "quick-xml",
  "rayon",
  "reqwest",
  "rusqlite",
@@ -1447,6 +1449,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22244ce15aa966053a896d1accb3a6e68469b97c7f33f284b99f0d576879fc23"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+ "serde",
 ]
 
 [[package]]

@@ -14,6 +14,10 @@ include = [
 ]
 keywords = ["nix", "nixos", "snowflakeos"]
 
+[[bin]]
+name = "generate-db"
+path = "src/bin/generate_db.rs"
+
 [dependencies]
 nix-editor = "0.3.0"
 reqwest = { version = "0.12", features = ["json", "brotli"] }
@@ -22,11 +26,13 @@ serde_json = "1.0"
 pretty_env_logger = "0.5"
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
+clap = { version = "4.5", features = ["derive"] }
 csv = "1.3"
 log = "0.4"
 lazy_static = "1.4"
 brotli = "6.0"
 rusqlite = "0.31"
+quick-xml = { version = "0.31", features = ["serialize"] }
 rayon = "1.8"
 
 tantivy = { version = "0.22", features = ["mmap"] }
