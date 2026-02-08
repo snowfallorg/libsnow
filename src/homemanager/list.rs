@@ -1,9 +1,10 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::{
+    Package, PackageAttr,
     config::configfile::{self, ConfigMode},
     metadata::Metadata,
-    toml as tomlcfg, Package, PackageAttr,
+    toml as tomlcfg,
 };
 
 pub fn list(md: &Metadata) -> Result<Vec<Package>> {
@@ -16,9 +17,8 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
             let pf = tomlcfg::read(std::path::Path::new(&path))?;
             pf.home
                 .get(&user)
-                .context("No home section for user")?
-                .packages
-                .clone()
+                .map(|s| s.packages.clone())
+                .unwrap_or_default()
         }
         ConfigMode::Nix => {
             let home_config = config.read_home_config_file()?;

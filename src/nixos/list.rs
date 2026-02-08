@@ -1,9 +1,10 @@
 use anyhow::Result;
 
 use crate::{
+    Package, PackageAttr,
     config::configfile::{self, ConfigMode},
     metadata::Metadata,
-    toml as tomlcfg, Package, PackageAttr,
+    toml as tomlcfg,
 };
 
 pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
