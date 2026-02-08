@@ -8,6 +8,7 @@
 let
   cfg = config.libsnow;
   toml = builtins.fromTOML (builtins.readFile cfg.packagesFile);
+  getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
   userPkgs = (toml.home.${cfg.user}.packages or [ ]);
 in
 {
@@ -28,6 +29,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = map (name: pkgs.${name}) userPkgs;
+    home.packages = map getPkg userPkgs;
   };
 }

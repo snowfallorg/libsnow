@@ -1,15 +1,16 @@
-{ cargo
-, makeWrapper
-, openssl
-, pkg-config
-, rustc
-, rustPlatform
-, bash
-, desktop-file-utils
-, hicolor-icon-theme
-, shared-mime-info
-, gtk3
-, substitute
+{
+  cargo,
+  makeWrapper,
+  openssl,
+  pkg-config,
+  rustc,
+  rustPlatform,
+  bash,
+  desktop-file-utils,
+  hicolor-icon-theme,
+  shared-mime-info,
+  gtk3,
+  substitute,
 }:
 
 rustPlatform.buildRustPackage rec {
@@ -18,9 +19,7 @@ rustPlatform.buildRustPackage rec {
 
   src = [ ../../libsnow-helper ];
 
-  cargoLock = {
-    lockFile = ../../libsnow-helper/Cargo.lock;
-  };
+  cargoLock.lockFile = ../../libsnow-helper/Cargo.lock;
 
   nativeBuildInputs = [
     cargo

@@ -8,7 +8,8 @@
 let
   cfg = config.libsnow;
   toml = builtins.fromTOML (builtins.readFile cfg.packagesFile);
-  systemPkgs = map (name: pkgs.${name}) (toml.system.packages or [ ]);
+  getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
+  systemPkgs = map getPkg (toml.system.packages or [ ]);
   homeUsers = toml.home or { };
 in
 {
@@ -27,7 +28,7 @@ in
     environment.systemPackages = systemPkgs;
 
     home-manager.users = lib.mapAttrs (_user: userCfg: {
-      home.packages = map (name: pkgs.${name}) (userCfg.packages or [ ]);
+      home.packages = map getPkg (userCfg.packages or [ ]);
     }) homeUsers;
   };
 }
