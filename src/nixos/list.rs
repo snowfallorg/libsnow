@@ -14,7 +14,17 @@ pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
         ConfigMode::Toml => {
             let path = tomlcfg::config_file_path()?;
             let pf = tomlcfg::read(std::path::Path::new(&path))?;
-            pf.system.packages
+            let mut attrs = pf.system.packages;
+            for key in pf.system.options.keys() {
+                if let Some(rest) = key.strip_prefix("programs.")
+                    && let Some(name) = rest.strip_suffix(".enable")
+                    && !name.contains('.')
+                    && !attrs.contains(&name.to_string())
+                {
+                    attrs.push(name.to_string());
+                }
+            }
+            attrs
         }
         ConfigMode::Nix => {
             let system_packages = nix_editor::read::getarrvals(

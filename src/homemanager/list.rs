@@ -15,10 +15,23 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
             let user = tomlcfg::current_user()?;
             let path = tomlcfg::config_file_path()?;
             let pf = tomlcfg::read(std::path::Path::new(&path))?;
-            pf.home
+            let mut attrs = pf
+                .home
                 .get(&user)
                 .map(|s| s.packages.clone())
-                .unwrap_or_default()
+                .unwrap_or_default();
+            if let Some(section) = pf.home.get(&user) {
+                for key in section.options.keys() {
+                    if let Some(rest) = key.strip_prefix("programs.")
+                        && let Some(name) = rest.strip_suffix(".enable")
+                        && !name.contains('.')
+                        && !attrs.contains(&name.to_string())
+                    {
+                        attrs.push(name.to_string());
+                    }
+                }
+            }
+            attrs
         }
         ConfigMode::Nix => {
             let home_config = config.read_home_config_file()?;
