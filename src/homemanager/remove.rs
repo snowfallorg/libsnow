@@ -39,7 +39,19 @@ pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
             let path = tomlcfg::config_file_path()?;
             let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
             if let Some(section) = pf.home.get_mut(&user) {
-                section.packages.retain(|p| !pkgs_to_remove.contains(p));
+                for attr in &pkgs_to_remove {
+                    section.packages.retain(|p| p != attr);
+                    let prefix = format!("programs.{}.", attr);
+                    let keys_to_remove: Vec<String> = section
+                        .options
+                        .keys()
+                        .filter(|k| k.starts_with(&prefix))
+                        .cloned()
+                        .collect();
+                    for key in keys_to_remove {
+                        section.options.remove(&key);
+                    }
+                }
             }
             (toml::to_string_pretty(&pf)?, path)
         }

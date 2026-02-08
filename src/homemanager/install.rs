@@ -8,6 +8,7 @@ use crate::{
 use anyhow::{Context, Result, anyhow};
 use log::debug;
 use tokio::io::AsyncWriteExt;
+use toml::Value as TomlValue;
 
 pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
     let config = configfile::get_config()?;
@@ -40,7 +41,12 @@ pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
             let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
             let section = pf.home.entry(user).or_default();
             for attr in &pkgs_to_install {
-                if !section.packages.contains(attr) {
+                if md.has_hm_program_option(attr) {
+                    let key = format!("programs.{}.enable", attr);
+                    if section.options.get(&key) != Some(&TomlValue::Boolean(true)) {
+                        section.options.insert(key, TomlValue::Boolean(true));
+                    }
+                } else if !section.packages.contains(attr) {
                     section.packages.push(attr.clone());
                 }
             }

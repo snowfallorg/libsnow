@@ -117,6 +117,24 @@ impl Metadata {
         Ok(results)
     }
 
+    /// Check whether a package has a corresponding `programs.<name>.enable`
+    /// NixOS option in the database.
+    pub fn has_program_option(&self, attribute: &str) -> bool {
+        self.conn
+            .prepare_cached("SELECT 1 FROM program_options WHERE attribute = ?")
+            .and_then(|mut stmt| stmt.exists([attribute]))
+            .unwrap_or(false)
+    }
+
+    /// Check whether a package has a corresponding `programs.<name>.enable`
+    /// home-manager option in the database.
+    pub fn has_hm_program_option(&self, attribute: &str) -> bool {
+        self.conn
+            .prepare_cached("SELECT 1 FROM hm_program_options WHERE attribute = ?")
+            .and_then(|mut stmt| stmt.exists([attribute]))
+            .unwrap_or(false)
+    }
+
     pub fn db_path(&self) -> &Path {
         &self.db_path
     }

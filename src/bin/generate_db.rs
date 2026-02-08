@@ -145,6 +145,97 @@ async fn fetch_packages(channel: &str, release: &str) -> Result<HashMap<String, 
     Ok(pkg_json.packages)
 }
 
+async fn fetch_program_options(
+    channel: &str,
+    release: &str,
+) -> Result<HashMap<String, HashMap<String, Value>>> {
+    let url = format!(
+        "https://releases.nixos.org/{}/{}/options.json.br",
+        channel, release
+    );
+
+    info!("Fetching {}", url);
+
+    let client = reqwest::Client::builder().brotli(true).build()?;
+    let resp = client.get(&url).send().await?;
+
+    if !resp.status().is_success() {
+        info!("Options file not available ({}), skipping", resp.status());
+        return Ok(HashMap::new());
+    }
+
+    let bytes = resp.bytes().await?;
+    let all_options: HashMap<String, Value> = serde_json::from_slice(&bytes)?;
+    let programs = extract_program_options(all_options);
+
+    info!("Found {} programs with NixOS options", programs.len());
+    Ok(programs)
+}
+
+fn extract_program_options(
+    all_options: HashMap<String, Value>,
+) -> HashMap<String, HashMap<String, Value>> {
+    let mut programs: HashMap<String, HashMap<String, Value>> = HashMap::new();
+    for (key, value) in all_options {
+        if let Some(rest) = key.strip_prefix("programs.")
+            && let Some(prog_name) = rest.split('.').next()
+        {
+            programs
+                .entry(prog_name.to_string())
+                .or_default()
+                .insert(key, value);
+        }
+    }
+    programs.retain(|name, opts| opts.contains_key(&format!("programs.{}.enable", name)));
+    programs
+}
+
+fn fetch_hm_program_options(channel: &str) -> Result<HashMap<String, HashMap<String, Value>>> {
+    let hm_branch = if channel.contains("unstable") || channel.starts_with("nixpkgs") {
+        "master".to_string()
+    } else {
+        // Extract version like "25.05" from "nixos/25.05"
+        let version = channel.rsplit('/').next().unwrap_or("master");
+        format!("release-{}", version)
+    };
+
+    info!(
+        "Building home-manager docs-json from branch '{}'",
+        hm_branch
+    );
+
+    let output = std::process::Command::new("nix")
+        .args([
+            "build",
+            &format!("github:nix-community/home-manager/{}#docs-json", hm_branch),
+            "--no-link",
+            "--print-out-paths",
+        ])
+        .output()
+        .context("Failed to run nix build for home-manager docs-json")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        info!("home-manager docs-json build failed, skipping: {}", stderr);
+        return Ok(HashMap::new());
+    }
+
+    let store_path = String::from_utf8(output.stdout)?.trim().to_string();
+    let json_path = format!("{}/share/doc/home-manager/options.json", store_path);
+
+    info!("Reading HM options from {}", json_path);
+    let content = std::fs::read_to_string(&json_path)
+        .with_context(|| format!("Failed to read {}", json_path))?;
+    let all_options: HashMap<String, Value> = serde_json::from_str(&content)?;
+
+    let programs = extract_program_options(all_options);
+    info!(
+        "Found {} programs with home-manager options",
+        programs.len()
+    );
+    Ok(programs)
+}
+
 async fn fetch_git_revision(channel: &str, release: &str) -> Result<String> {
     let url = format!(
         "https://releases.nixos.org/{}/{}/git-revision",
@@ -154,7 +245,12 @@ async fn fetch_git_revision(channel: &str, release: &str) -> Result<String> {
     Ok(rev.trim().to_string())
 }
 
-fn create_database(packages: &HashMap<String, Package>, db_path: &str) -> Result<()> {
+fn create_database(
+    packages: &HashMap<String, Package>,
+    program_options: &HashMap<String, HashMap<String, Value>>,
+    hm_program_options: &HashMap<String, HashMap<String, Value>>,
+    db_path: &str,
+) -> Result<()> {
     // Remove old db if present
     let _ = std::fs::remove_file(db_path);
 
@@ -195,8 +291,36 @@ fn create_database(packages: &HashMap<String, Package>, db_path: &str) -> Result
         [],
     )?;
 
+    conn.execute(
+        r#"CREATE TABLE program_options (
+            "attribute" TEXT NOT NULL UNIQUE,
+            "options" JSON NOT NULL,
+            FOREIGN KEY("attribute") REFERENCES "pkgs" ("attribute"),
+            PRIMARY KEY("attribute")
+        )"#,
+        [],
+    )?;
+
+    conn.execute(
+        r#"CREATE TABLE hm_program_options (
+            "attribute" TEXT NOT NULL UNIQUE,
+            "options" JSON NOT NULL,
+            FOREIGN KEY("attribute") REFERENCES "pkgs" ("attribute"),
+            PRIMARY KEY("attribute")
+        )"#,
+        [],
+    )?;
+
     conn.execute(r#"CREATE INDEX "idx_pkgs" ON "pkgs" ("attribute")"#, [])?;
     conn.execute(r#"CREATE INDEX "idx_meta" ON "meta" ("attribute")"#, [])?;
+    conn.execute(
+        r#"CREATE INDEX "idx_program_options" ON "program_options" ("attribute")"#,
+        [],
+    )?;
+    conn.execute(
+        r#"CREATE INDEX "idx_hm_program_options" ON "hm_program_options" ("attribute")"#,
+        [],
+    )?;
 
     // Insert in a single transaction for speed
     conn.execute_batch("BEGIN")?;
@@ -261,6 +385,24 @@ fn create_database(packages: &HashMap<String, Package>, db_path: &str) -> Result
         }
     }
 
+    {
+        let mut opt_stmt = conn.prepare(
+            "INSERT OR IGNORE INTO program_options (attribute, options) VALUES (?1, ?2)",
+        )?;
+        for (prog, opts) in program_options {
+            let json = serde_json::to_string(opts)?;
+            opt_stmt.execute(rusqlite::params![prog, json])?;
+        }
+
+        let mut hm_stmt = conn.prepare(
+            "INSERT OR IGNORE INTO hm_program_options (attribute, options) VALUES (?1, ?2)",
+        )?;
+        for (prog, opts) in hm_program_options {
+            let json = serde_json::to_string(opts)?;
+            hm_stmt.execute(rusqlite::params![prog, json])?;
+        }
+    }
+
     conn.execute_batch("COMMIT")?;
 
     info!("Database written to {}", db_path);
@@ -307,14 +449,17 @@ async fn main() -> Result<()> {
     let git_rev = fetch_git_revision(channel, &release).await?;
     info!("Git revision: {}", git_rev);
 
-    // Fetch package metadata
+    // Fetch package metadata and program options
     info!("Fetching package metadata for {}/{} ...", channel, release);
     let packages = fetch_packages(channel, &release).await?;
     info!("Got {} packages", packages.len());
 
+    let program_options = fetch_program_options(channel, &release).await?;
+    let hm_program_options = fetch_hm_program_options(channel)?;
+
     // Build the database
     let db_path = format!("{}/{}.db", args.output, git_rev);
-    create_database(&packages, &db_path)?;
+    create_database(&packages, &program_options, &hm_program_options, &db_path)?;
     if args.with_index {
         info!("Building search index ...");
         create_search_index(&db_path)?;

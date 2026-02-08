@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{Context, Result, anyhow};
 use log::debug;
 use tokio::io::AsyncWriteExt;
+use toml::Value as TomlValue;
 
 pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
     let config = configfile::get_config()?;
@@ -38,7 +39,12 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
             let path = tomlcfg::config_file_path()?;
             let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
             for attr in &pkgs_to_install {
-                if !pf.system.packages.contains(attr) {
+                if md.has_program_option(attr) {
+                    let key = format!("programs.{}.enable", attr);
+                    if pf.system.options.get(&key) != Some(&TomlValue::Boolean(true)) {
+                        pf.system.options.insert(key, TomlValue::Boolean(true));
+                    }
+                } else if !pf.system.packages.contains(attr) {
                     pf.system.packages.push(attr.clone());
                 }
             }
