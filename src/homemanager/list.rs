@@ -1,23 +1,42 @@
-use crate::{Package, PackageAttr, config::configfile::get_config, metadata::Metadata};
-use anyhow::Result;
+use anyhow::{Context, Result};
+
+use crate::{
+    Package, PackageAttr,
+    config::configfile::{self, ConfigMode},
+    metadata::Metadata,
+    toml as tomlcfg,
+};
 
 pub fn list(md: &Metadata) -> Result<Vec<Package>> {
-    let config = get_config()?;
+    let config = configfile::get_config()?;
 
-    let home_config = config.read_home_config_file()?;
-    let home_packages = nix_editor::read::getarrvals(&home_config, "home.packages")?;
-
-    let pkgs = home_packages
-        .iter()
-        .map(|x| x.strip_prefix("pkgs.").unwrap_or(x))
-        .collect::<Vec<_>>();
+    let attrs: Vec<String> = match config.mode {
+        ConfigMode::Toml => {
+            let user = tomlcfg::current_user()?;
+            let path = tomlcfg::packages_file_path()?;
+            let pf = tomlcfg::read(std::path::Path::new(&path))?;
+            pf.home
+                .get(&user)
+                .context("No home section for user")?
+                .packages
+                .clone()
+        }
+        ConfigMode::Nix => {
+            let home_config = config.read_home_config_file()?;
+            let home_packages = nix_editor::read::getarrvals(&home_config, "home.packages")?;
+            home_packages
+                .iter()
+                .map(|x| x.strip_prefix("pkgs.").unwrap_or(x).to_string())
+                .collect()
+        }
+    };
 
     let mut packages = Vec::new();
-    for pkg in &pkgs {
-        if let Ok(info) = md.get(pkg) {
+    for attr in &attrs {
+        if let Ok(info) = md.get(attr) {
             packages.push(Package {
                 attr: PackageAttr::NixPkgs {
-                    attr: pkg.to_string(),
+                    attr: attr.to_string(),
                 },
                 version: if !info.version.is_empty() {
                     Some(info.version)
@@ -25,6 +44,13 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
                     None
                 },
                 pname: Some(info.pname),
+                ..Default::default()
+            });
+        } else {
+            packages.push(Package {
+                attr: PackageAttr::NixPkgs {
+                    attr: attr.to_string(),
+                },
                 ..Default::default()
             });
         }

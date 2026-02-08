@@ -7,6 +7,7 @@ pub mod metadata;
 pub mod nixenv;
 pub mod nixos;
 pub mod profile;
+pub mod toml;
 pub mod utils;
 
 #[derive(Debug, Clone, Default)]

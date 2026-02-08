@@ -7,6 +7,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigMode {
+    #[default]
+    Nix,
+    Toml,
+}
+
 /// Struct containing locations of system configuration files and some user configuration.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Default)]
 pub struct LibSnowConfig {
@@ -16,12 +24,17 @@ pub struct LibSnowConfig {
     pub homeconfig: Option<String>,
     /// Path to the NixOS flake file. Typically `/etc/nixos/flake.nix`.
     pub flake: Option<String>,
-    /// Specifies which configuration should be user from the `nixosConfigurations` attribute set in the flake file.
+    /// Specifies which configuration should be used from the `nixosConfigurations` attribute set in the flake file.
     /// If not set, NixOS defaults to the hostname of the system.
     pub host: Option<String>,
     /// Specifies how many NixOS generations to keep. If set to 0, all generations will be kept.
     /// If not set, the default is 5.
     pub generations: Option<u32>,
+    /// Whether packages are managed via Nix files or a TOML packages file.
+    #[serde(default)]
+    pub mode: ConfigMode,
+    /// Path to the TOML packages file. Only used when `mode` is `Toml`.
+    pub packages_file: Option<String>,
 }
 
 impl LibSnowConfig {
