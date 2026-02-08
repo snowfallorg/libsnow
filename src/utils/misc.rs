@@ -38,27 +38,6 @@ pub fn get_pname_version_from_storepath(path: &str) -> Result<(String, Option<St
     get_pname_version(&name)
 }
 
-pub fn get_pname_from_storepath(path: &str, version: Option<String>) -> Result<String> {
-    let name = get_name_from_storepath(path)?;
-    // hello-1.2.3 -> hello: where version="1.2.3"
-    let name = if let Some(version) = version {
-        name.strip_suffix(format!("-{}", version).as_str())
-            .context("No name found")?
-    } else {
-        &name
-    };
-    Ok(name.to_string())
-}
-
-pub fn get_version_from_storepath(path: &str, pname: &str) -> Result<String> {
-    let name = get_name_from_storepath(path)?;
-    // hello-1.2.3 -> 1.2.3: where pname="hello"
-    let version = name
-        .strip_prefix(&format!("{}-", pname))
-        .context("No version found")?;
-    Ok(version.to_string())
-}
-
 pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
     let mut updatable = vec![];
     let new_md = Metadata::connect_latest().await?;
