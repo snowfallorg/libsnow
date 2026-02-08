@@ -1,5 +1,5 @@
 use crate::{CONFIG, CONFIGDIR, HOME, SYSCONFIG};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -33,8 +33,8 @@ pub struct LibSnowConfig {
     /// Whether packages are managed via Nix files or a TOML packages file.
     #[serde(default)]
     pub mode: ConfigMode,
-    /// Path to the TOML packages file. Only used when `mode` is `Toml`.
-    pub packages_file: Option<String>,
+    /// Path to the TOML config file. Only used when `mode` is `Toml`.
+    pub config_file: Option<String>,
 }
 
 impl LibSnowConfig {

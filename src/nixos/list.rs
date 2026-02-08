@@ -1,10 +1,9 @@
 use anyhow::Result;
 
 use crate::{
-    Package, PackageAttr,
     config::configfile::{self, ConfigMode},
     metadata::Metadata,
-    toml as tomlcfg,
+    toml as tomlcfg, Package, PackageAttr,
 };
 
 pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
@@ -12,7 +11,7 @@ pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
 
     let attrs: Vec<String> = match config.mode {
         ConfigMode::Toml => {
-            let path = tomlcfg::packages_file_path()?;
+            let path = tomlcfg::config_file_path()?;
             let pf = tomlcfg::read(std::path::Path::new(&path))?;
             pf.system.packages
         }

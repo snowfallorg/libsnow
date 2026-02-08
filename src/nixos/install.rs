@@ -35,7 +35,7 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
 
     let (content, output_path) = match config.mode {
         ConfigMode::Toml => {
-            let path = tomlcfg::packages_file_path()?;
+            let path = tomlcfg::config_file_path()?;
             let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
             for attr in &pkgs_to_install {
                 if !pf.system.packages.contains(attr) {

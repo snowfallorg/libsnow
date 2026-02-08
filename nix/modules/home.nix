@@ -1,4 +1,4 @@
-packagesFile: user:
+configFile: user:
 
 {
   config,
@@ -9,7 +9,7 @@ packagesFile: user:
 
 let
   cfg = config.libsnow;
-  toml = builtins.fromTOML (builtins.readFile packagesFile);
+  toml = builtins.fromTOML (builtins.readFile configFile);
 
   getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
 
@@ -27,16 +27,16 @@ let
       host = cfg.host;
       generations = cfg.generations;
       mode = "toml";
-      packages_file = cfg.packages_file;
+      config_file = cfg.config_file;
     }
   );
 in
 {
   options.libsnow = {
-    packages_file = lib.mkOption {
+    config_file = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Runtime filesystem path to packages.toml.";
+      description = "Path to the TOML config file.";
     };
 
     homeconfig = lib.mkOption {
