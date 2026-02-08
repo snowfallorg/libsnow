@@ -19,6 +19,8 @@ pub struct PackagesFile {
 pub struct Section {
     #[serde(default)]
     pub packages: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub options: BTreeMap<String, toml::Value>,
 }
 
 pub fn read(path: &Path) -> Result<PackagesFile> {
