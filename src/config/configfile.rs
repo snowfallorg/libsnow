@@ -37,6 +37,8 @@ pub struct LibSnowConfig {
     pub system_config_file: Option<String>,
     /// Path to the home-manager TOML config file. Only used when `mode` is `Toml`.
     pub home_config_file: Option<String>,
+    /// Whether home-manager is configured as part of the system config or seperately.
+    pub system_for_home_manager: bool,
 }
 
 impl LibSnowConfig {

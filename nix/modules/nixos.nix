@@ -29,9 +29,10 @@ let
         flake
         host
         generations
+        system_config_file
+        home_config_file
+        system_for_home_manager
         ;
-      system_config_file = cfg.system_config_file;
-      home_config_file = cfg.home_config_file;
       mode = "toml";
     }
   );
@@ -78,6 +79,12 @@ in
       type = lib.types.nullOr lib.types.ints.unsigned;
       default = 5;
       description = "Number of NixOS generations to keep.";
+    };
+
+    system_for_home_manager = lib.mkOption {
+      type = lib.types.nullOr lib.types.bool;
+      default = null;
+      description = "Whether home-manager is configured as part of the system config or seperately."; 
     };
   };
 
