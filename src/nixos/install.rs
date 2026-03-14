@@ -36,19 +36,19 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
 
     let (content, output_path) = match config.mode {
         ConfigMode::Toml => {
-            let path = tomlcfg::config_file_path()?;
-            let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
+            let path = tomlcfg::system_config_file_path()?;
+            let mut pf = tomlcfg::read_system(std::path::Path::new(&path))?;
             for attr in &pkgs_to_install {
                 if md.has_program_option(attr) {
                     let key = format!("programs.{}.enable", attr);
-                    if pf.system.options.get(&key) != Some(&TomlValue::Boolean(true)) {
-                        pf.system.options.insert(key, TomlValue::Boolean(true));
+                    if pf.options.get(&key) != Some(&TomlValue::Boolean(true)) {
+                        pf.options.insert(key, TomlValue::Boolean(true));
                     }
-                } else if !pf.system.packages.contains(attr) {
-                    pf.system.packages.push(attr.clone());
+                } else if !pf.packages.contains(attr) {
+                    pf.packages.push(attr.clone());
                 }
             }
-            pf.system.packages.sort();
+            pf.packages.sort();
             (toml::to_string_pretty(&pf)?, path)
         }
         ConfigMode::Nix => {

@@ -1,44 +1,53 @@
-configFile:
-
 {
   config,
   lib,
   pkgs,
+  libsnowSystemConfig,
+  libsnowHomeConfig ? null,
   ...
 }:
 
 let
   cfg = config.libsnow;
-  toml = builtins.fromTOML (builtins.readFile configFile);
+  systemToml = builtins.fromTOML (builtins.readFile libsnowSystemConfig);
+  homeToml =
+    if libsnowHomeConfig != null then builtins.fromTOML (builtins.readFile libsnowHomeConfig) else { };
 
   getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
 
   optionFragments =
     opts: lib.mapAttrsToList (path: value: lib.setAttrByPath (lib.splitString "." path) value) opts;
 
-  systemPkgs = map getPkg (toml.system.packages or [ ]);
-  systemOptFragments = optionFragments (toml.system.options or { });
-
-  homeUsers = toml.home or { };
+  systemPkgs = map getPkg (systemToml.packages or [ ]);
+  systemOptFragments = optionFragments (systemToml.options or { });
 
   configJson = builtins.toJSON (
     lib.filterAttrs (_: v: v != null) {
-      systemconfig = cfg.systemconfig;
-      homeconfig = cfg.homeconfig;
-      flake = cfg.flake;
-      host = cfg.host;
-      generations = cfg.generations;
+      inherit (cfg)
+        systemconfig
+        homeconfig
+        flake
+        host
+        generations
+        ;
+      system_config_file = cfg.system_config_file;
+      home_config_file = cfg.home_config_file;
       mode = "toml";
-      config_file = cfg.config_file;
     }
   );
 in
 {
   options.libsnow = {
-    config_file = lib.mkOption {
+    system_config_file = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Path to the TOML config file.";
+      description = "Path to the system TOML config file.";
+    };
+
+    home_config_file = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Path to the home-manager TOML config file.";
     };
 
     systemconfig = lib.mkOption {
@@ -77,7 +86,8 @@ in
       { environment.systemPackages = systemPkgs; }
 
       { environment.etc."libsnow/config.json".text = configJson; }
-
+    ]
+    ++ lib.optionals (libsnowHomeConfig != null) [
       {
         home-manager.users = lib.mapAttrs (
           _user: userCfg:
@@ -87,7 +97,7 @@ in
             ]
             ++ optionFragments (userCfg.options or { })
           )
-        ) homeUsers;
+        ) homeToml;
       }
     ]
     ++ systemOptFragments

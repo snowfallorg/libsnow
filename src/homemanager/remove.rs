@@ -36,9 +36,9 @@ pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
     let (content, output_path) = match config.mode {
         ConfigMode::Toml => {
             let user = tomlcfg::current_user()?;
-            let path = tomlcfg::config_file_path()?;
-            let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
-            if let Some(section) = pf.home.get_mut(&user) {
+            let path = tomlcfg::home_config_file_path()?;
+            let mut pf = tomlcfg::read_home(std::path::Path::new(&path))?;
+            if let Some(section) = pf.users.get_mut(&user) {
                 for attr in &pkgs_to_remove {
                     section.packages.retain(|p| p != attr);
                     let prefix = format!("programs.{}.", attr);

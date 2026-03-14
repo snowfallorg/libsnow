@@ -12,10 +12,10 @@ pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
 
     let attrs: Vec<String> = match config.mode {
         ConfigMode::Toml => {
-            let path = tomlcfg::config_file_path()?;
-            let pf = tomlcfg::read(std::path::Path::new(&path))?;
-            let mut attrs = pf.system.packages;
-            for key in pf.system.options.keys() {
+            let path = tomlcfg::system_config_file_path()?;
+            let pf = tomlcfg::read_system(std::path::Path::new(&path))?;
+            let mut attrs = pf.packages;
+            for key in pf.options.keys() {
                 if let Some(rest) = key.strip_prefix("programs.")
                     && let Some(name) = rest.strip_suffix(".enable")
                     && !name.contains('.')

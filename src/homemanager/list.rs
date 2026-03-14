@@ -13,14 +13,13 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
     let attrs: Vec<String> = match config.mode {
         ConfigMode::Toml => {
             let user = tomlcfg::current_user()?;
-            let path = tomlcfg::config_file_path()?;
-            let pf = tomlcfg::read(std::path::Path::new(&path))?;
-            let mut attrs = pf
-                .home
-                .get(&user)
+            let path = tomlcfg::home_config_file_path()?;
+            let pf = tomlcfg::read_home(std::path::Path::new(&path))?;
+            let section = pf.users.get(&user);
+            let mut attrs = section
                 .map(|s| s.packages.clone())
                 .unwrap_or_default();
-            if let Some(section) = pf.home.get(&user) {
+            if let Some(section) = section {
                 for key in section.options.keys() {
                     if let Some(rest) = key.strip_prefix("programs.")
                         && let Some(name) = rest.strip_suffix(".enable")

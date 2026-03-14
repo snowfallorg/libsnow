@@ -1,42 +1,44 @@
-configFile: user:
-
 {
   config,
   lib,
   pkgs,
+  libsnowHomeConfig,
+  libsnowUser,
   ...
 }:
 
 let
   cfg = config.libsnow;
-  toml = builtins.fromTOML (builtins.readFile configFile);
+  toml = builtins.fromTOML (builtins.readFile libsnowHomeConfig);
 
   getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
 
   optionFragments =
     opts: lib.mapAttrsToList (path: value: lib.setAttrByPath (lib.splitString "." path) value) opts;
 
-  userSection = toml.home.${user} or { };
+  userSection = toml.${libsnowUser} or { };
   userPkgs = userSection.packages or [ ];
   userOptFragments = optionFragments (userSection.options or { });
 
   configJson = builtins.toJSON (
     lib.filterAttrs (_: v: v != null) {
-      homeconfig = cfg.homeconfig;
-      flake = cfg.flake;
-      host = cfg.host;
-      generations = cfg.generations;
+      inherit (cfg)
+        homeconfig
+        flake
+        host
+        generations
+        ;
+      home_config_file = cfg.home_config_file;
       mode = "toml";
-      config_file = cfg.config_file;
     }
   );
 in
 {
   options.libsnow = {
-    config_file = lib.mkOption {
+    home_config_file = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Path to the TOML config file.";
+      description = "Path to the home-manager TOML config file.";
     };
 
     homeconfig = lib.mkOption {

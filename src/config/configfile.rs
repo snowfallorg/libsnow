@@ -33,8 +33,10 @@ pub struct LibSnowConfig {
     /// Whether packages are managed via Nix files or a TOML packages file.
     #[serde(default)]
     pub mode: ConfigMode,
-    /// Path to the TOML config file. Only used when `mode` is `Toml`.
-    pub config_file: Option<String>,
+    /// Path to the system TOML config file. Only used when `mode` is `Toml`.
+    pub system_config_file: Option<String>,
+    /// Path to the home-manager TOML config file. Only used when `mode` is `Toml`.
+    pub home_config_file: Option<String>,
 }
 
 impl LibSnowConfig {
@@ -80,6 +82,20 @@ impl LibSnowConfig {
 
     pub fn get_generation_count(&self) -> Option<u32> {
         self.generations
+    }
+
+    pub fn nixos_configured(&self) -> bool {
+        match self.mode {
+            ConfigMode::Nix => self.systemconfig.is_some(),
+            ConfigMode::Toml => self.system_config_file.is_some(),
+        }
+    }
+
+    pub fn home_manager_configured(&self) -> bool {
+        match self.mode {
+            ConfigMode::Nix => self.homeconfig.is_some(),
+            ConfigMode::Toml => self.home_config_file.is_some(),
+        }
     }
 }
 

@@ -37,9 +37,9 @@ pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
     let (content, output_path) = match config.mode {
         ConfigMode::Toml => {
             let user = tomlcfg::current_user()?;
-            let path = tomlcfg::config_file_path()?;
-            let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
-            let section = pf.home.entry(user).or_default();
+            let path = tomlcfg::home_config_file_path()?;
+            let mut pf = tomlcfg::read_home(std::path::Path::new(&path))?;
+            let section = pf.users.entry(user).or_default();
             for attr in &pkgs_to_install {
                 if md.has_hm_program_option(attr) {
                     let key = format!("programs.{}.enable", attr);

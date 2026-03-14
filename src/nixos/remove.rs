@@ -35,20 +35,19 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
 
     let (content, output_path) = match config.mode {
         ConfigMode::Toml => {
-            let path = tomlcfg::config_file_path()?;
-            let mut pf = tomlcfg::read(std::path::Path::new(&path))?;
+            let path = tomlcfg::system_config_file_path()?;
+            let mut pf = tomlcfg::read_system(std::path::Path::new(&path))?;
             for attr in &pkgs_to_remove {
-                pf.system.packages.retain(|p| p != attr);
+                pf.packages.retain(|p| p != attr);
                 let prefix = format!("programs.{}.", attr);
                 let keys_to_remove: Vec<String> = pf
-                    .system
                     .options
                     .keys()
                     .filter(|k| k.starts_with(&prefix))
                     .cloned()
                     .collect();
                 for key in keys_to_remove {
-                    pf.system.options.remove(&key);
+                    pf.options.remove(&key);
                 }
             }
             (toml::to_string_pretty(&pf)?, path)
