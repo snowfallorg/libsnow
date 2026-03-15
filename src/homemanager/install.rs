@@ -3,6 +3,7 @@ use crate::{
     config::configfile::{self, ConfigMode},
     homemanager::list::list,
     metadata::Metadata,
+    nixos::AuthMethod,
     toml as tomlcfg,
 };
 use anyhow::{Context, Result, anyhow};
@@ -10,7 +11,7 @@ use log::debug;
 use tokio::io::AsyncWriteExt;
 use toml::Value as TomlValue;
 
-pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
+pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
     let config = configfile::get_config()?;
 
     let installed: Vec<String> = list(md)
@@ -73,24 +74,36 @@ pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
         }
     };
 
-    let mut output = tokio::process::Command::new(HELPER_EXEC)
-        .arg("config-home")
-        .arg("--output")
-        .arg(&output_path)
-        .args(if let Some(generations) = config.get_generation_count() {
-            vec!["--generations".to_string(), generations.to_string()]
-        } else {
-            vec![]
-        })
-        .arg("--")
-        .arg("switch")
-        .args(if let Ok(flakedir) = config.get_flake_dir() {
-            vec!["--flake".to_string(), flakedir]
-        } else {
-            vec![]
-        })
-        .stdin(std::process::Stdio::piped())
-        .spawn()?;
+    let mut output = tokio::process::Command::new(if config.system_for_home_manager {
+        match auth_method {
+            AuthMethod::Pkexec => "pkexec",
+            AuthMethod::Sudo => "sudo",
+            AuthMethod::Custom(cmd) => cmd,
+        }
+    } else {
+        HELPER_EXEC
+    })
+    .args(if config.system_for_home_manager {
+        vec![HELPER_EXEC, "config"]
+    } else {
+        vec!["config-home"]
+    })
+    .arg("--output")
+    .arg(&output_path)
+    .args(if let Some(generations) = config.get_generation_count() {
+        vec!["--generations".to_string(), generations.to_string()]
+    } else {
+        vec![]
+    })
+    .arg("--")
+    .arg("switch")
+    .args(if let Ok(flakedir) = config.get_flake_dir() {
+        vec!["--flake".to_string(), flakedir]
+    } else {
+        vec![]
+    })
+    .stdin(std::process::Stdio::piped())
+    .spawn()?;
     output
         .stdin
         .as_mut()

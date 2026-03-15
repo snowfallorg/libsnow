@@ -1,15 +1,11 @@
 use crate::{
-    HELPER_EXEC,
-    config::configfile::{self, ConfigMode},
-    homemanager::list::list,
-    metadata::Metadata,
-    toml as tomlcfg,
+    HELPER_EXEC, config::configfile::{self, ConfigMode}, homemanager::list::list, metadata::Metadata, nixos::AuthMethod, toml as tomlcfg
 };
 use anyhow::{Context, Result, anyhow};
 use log::debug;
 use tokio::io::AsyncWriteExt;
 
-pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
+pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
     let config = configfile::get_config()?;
 
     let installed: Vec<String> = list(md)
@@ -74,10 +70,22 @@ pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
         }
     };
 
-    let mut output = tokio::process::Command::new(HELPER_EXEC)
-        .arg("config-home")
-        .arg("--output")
-        .arg(&output_path)
+    let mut output = tokio::process::Command::new(if config.system_for_home_manager {
+        match auth_method {
+            AuthMethod::Pkexec => "pkexec",
+            AuthMethod::Sudo => "sudo",
+            AuthMethod::Custom(cmd) => cmd,
+        }
+    } else {
+        HELPER_EXEC
+    })
+    .args(if config.system_for_home_manager {
+        vec![HELPER_EXEC, "config"]
+    } else {
+        vec!["config-home"]
+    })
+    .arg("--output")
+    .arg(&output_path)
         .args(if let Some(generations) = config.get_generation_count() {
             vec!["--generations".to_string(), generations.to_string()]
         } else {
