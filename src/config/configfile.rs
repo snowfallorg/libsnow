@@ -100,6 +100,20 @@ impl LibSnowConfig {
             ConfigMode::Toml => self.home_config_file.is_some(),
         }
     }
+
+    pub fn merge(self, other: LibSnowConfig) -> LibSnowConfig {
+        LibSnowConfig {
+            systemconfig: other.systemconfig.or(self.systemconfig),
+            homeconfig: other.homeconfig.or(self.homeconfig),
+            flake: other.flake.or(self.flake),
+            host: other.host.or(self.host),
+            generations: other.generations.or(self.generations),
+            mode: other.mode,
+            system_config_file: other.system_config_file.or(self.system_config_file),
+            home_config_file: other.home_config_file.or(self.home_config_file),
+            system_for_home_manager: other.system_for_home_manager || self.system_for_home_manager,
+        }
+    }
 }
 
 /// Type of package management used by the user.
@@ -112,21 +126,31 @@ pub enum UserPkgType {
 }
 
 /// Reads the config file and returns the config struct.
-/// If the config file doesn't exist in both the user (`~/.config/nix-data`) and system (`/etc/nix-data`) config directories,
-/// this function will return an error.
+/// If both system (`/etc/libsnow/config.json`) and user (`~/.config/libsnow/config.json`)
+/// configs exist, they are merged.
 pub fn get_config() -> Result<LibSnowConfig> {
-    // Check if user config exists
-    if Path::new(&*CONFIG).exists() {
-        // Read user config
-        let config: LibSnowConfig = serde_json::from_reader(BufReader::new(File::open(&*CONFIG)?))?;
-        Ok(config)
-    } else if Path::new(SYSCONFIG).exists() {
-        // Read system config
-        let config: LibSnowConfig =
-            serde_json::from_reader(BufReader::new(File::open(SYSCONFIG)?))?;
-        Ok(config)
-    } else {
-        Err(anyhow!("No config file found"))
+    let sys_exists = Path::new(SYSCONFIG).exists();
+    let home_exists = Path::new(&*CONFIG).exists();
+
+    match (sys_exists, home_exists) {
+        (true, true) => {
+            let sys: LibSnowConfig =
+                serde_json::from_reader(BufReader::new(File::open(SYSCONFIG)?))?;
+            let home: LibSnowConfig =
+                serde_json::from_reader(BufReader::new(File::open(&*CONFIG)?))?;
+            Ok(sys.merge(home))
+        }
+        (false, true) => {
+            let config: LibSnowConfig =
+                serde_json::from_reader(BufReader::new(File::open(&*CONFIG)?))?;
+            Ok(config)
+        }
+        (true, false) => {
+            let config: LibSnowConfig =
+                serde_json::from_reader(BufReader::new(File::open(SYSCONFIG)?))?;
+            Ok(config)
+        }
+        (false, false) => Err(anyhow!("No config file found")),
     }
 }
 
