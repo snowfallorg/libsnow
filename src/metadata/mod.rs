@@ -117,6 +117,28 @@ impl Metadata {
         Ok(results)
     }
 
+    /// Return all attribute names that have a NixOS `programs.<name>.enable` option.
+    pub fn all_program_option_attrs(&self) -> Vec<String> {
+        self.conn
+            .prepare_cached("SELECT attribute FROM program_options")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get(0))?;
+                rows.collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Return all attribute names that have a home-manager `programs.<name>.enable` option.
+    pub fn all_hm_program_option_attrs(&self) -> Vec<String> {
+        self.conn
+            .prepare_cached("SELECT attribute FROM hm_program_options")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get(0))?;
+                rows.collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Check whether a package has a corresponding `programs.<name>.enable`
     /// NixOS option in the database.
     pub fn has_program_option(&self, attribute: &str) -> bool {

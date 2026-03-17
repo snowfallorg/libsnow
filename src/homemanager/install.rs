@@ -55,22 +55,39 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
             (toml::to_string_pretty(&pf)?, path)
         }
         ConfigMode::Nix => {
-            let oldconfig = config.read_home_config_file()?;
-            if let Ok(withvals) = nix_editor::read::getwithvalue(&oldconfig, "home.packages")
-                && !withvals.contains(&String::from("pkgs"))
-            {
-                pkgs_to_install = pkgs_to_install
-                    .iter()
-                    .map(|x| format!("pkgs.{}", x))
-                    .collect();
+            let mut current = config.read_home_config_file()?;
+            let mut arr_pkgs = vec![];
+            for attr in &pkgs_to_install {
+                if md.has_hm_program_option(attr) {
+                    let key = format!("programs.{}.enable", attr);
+                    current = nix_editor::write::write(&current, &key, "true")
+                        .map_err(|e| anyhow!("{}", e))?;
+                } else {
+                    arr_pkgs.push(attr.clone());
+                }
             }
-            let newconfig =
-                nix_editor::write::addtoarr(&oldconfig, "home.packages", pkgs_to_install)?;
+            if !arr_pkgs.is_empty() {
+                if let Ok(withvals) =
+                    nix_editor::read::getwithvalue(&current, "home.packages")
+                    && !withvals.contains(&String::from("pkgs"))
+                {
+                    arr_pkgs = arr_pkgs
+                        .iter()
+                        .map(|x| format!("pkgs.{}", x))
+                        .collect();
+                }
+                current = nix_editor::write::addtoarr(
+                    &current,
+                    "home.packages",
+                    arr_pkgs,
+                )
+                .map_err(|e| anyhow!("{}", e))?;
+            }
             let path = config
                 .home_config_file
                 .clone()
                 .context("Failed to get home config path")?;
-            (newconfig, path)
+            (current, path)
         }
     };
 

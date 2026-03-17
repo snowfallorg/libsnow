@@ -27,14 +27,22 @@ pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
             attrs
         }
         ConfigMode::Nix => {
-            let system_packages = nix_editor::read::getarrvals(
-                &config.read_system_config_file()?,
-                "environment.systemPackages",
-            )?;
-            system_packages
+            let content = config.read_system_config_file()?;
+            let system_packages =
+                nix_editor::read::getarrvals(&content, "environment.systemPackages")?;
+            let mut attrs: Vec<String> = system_packages
                 .iter()
                 .map(|x| x.strip_prefix("pkgs.").unwrap_or(x).to_string())
-                .collect()
+                .collect();
+            for name in md.all_program_option_attrs() {
+                let key = format!("programs.{}.enable", name);
+                if let Ok(val) = nix_editor::read::readvalue(&content, &key) {
+                    if val.trim() == "true" && !attrs.contains(&name) {
+                        attrs.push(name);
+                    }
+                }
+            }
+            attrs
         }
     };
 

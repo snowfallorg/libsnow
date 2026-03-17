@@ -33,12 +33,21 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
             attrs
         }
         ConfigMode::Nix => {
-            let home_config = config.read_home_config_file()?;
-            let home_packages = nix_editor::read::getarrvals(&home_config, "home.packages")?;
-            home_packages
+            let content = config.read_home_config_file()?;
+            let home_packages = nix_editor::read::getarrvals(&content, "home.packages")?;
+            let mut attrs: Vec<String> = home_packages
                 .iter()
                 .map(|x| x.strip_prefix("pkgs.").unwrap_or(x).to_string())
-                .collect()
+                .collect();
+            for name in md.all_hm_program_option_attrs() {
+                let key = format!("programs.{}.enable", name);
+                if let Ok(val) = nix_editor::read::readvalue(&content, &key) {
+                    if val.trim() == "true" && !attrs.contains(&name) {
+                        attrs.push(name);
+                    }
+                }
+            }
+            attrs
         }
     };
 
