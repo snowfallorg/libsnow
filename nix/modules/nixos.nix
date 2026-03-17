@@ -24,14 +24,12 @@ let
   configJson = builtins.toJSON (
     lib.filterAttrs (_: v: v != null) {
       inherit (cfg)
-        systemconfig
-        homeconfig
+        home_config_file
+        system_for_home_manager
         flake
         host
         generations
         system_config_file
-        home_config_file
-        system_for_home_manager
         ;
       mode = "toml";
     }
@@ -49,18 +47,6 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = "Path to the home-manager TOML config file.";
-    };
-
-    systemconfig = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Path to the NixOS configuration file.";
-    };
-
-    homeconfig = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Path to the home-manager configuration file.";
     };
 
     flake = lib.mkOption {
@@ -84,7 +70,7 @@ in
     system_for_home_manager = lib.mkOption {
       type = lib.types.nullOr lib.types.bool;
       default = null;
-      description = "Whether home-manager is configured as part of the system config or seperately."; 
+      description = "Whether home-manager is configured as part of the system config or seperately.";
     };
   };
 

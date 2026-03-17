@@ -67,7 +67,7 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
             let newconfig =
                 nix_editor::write::addtoarr(&oldconfig, "home.packages", pkgs_to_install)?;
             let path = config
-                .homeconfig
+                .home_config_file
                 .clone()
                 .context("Failed to get home config path")?;
             (newconfig, path)

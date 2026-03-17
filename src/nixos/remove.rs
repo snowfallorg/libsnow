@@ -66,7 +66,7 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
             let newconfig =
                 nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", pkgs_to_remove)?;
             let path = config
-                .systemconfig
+                .system_config_file
                 .clone()
                 .context("Failed to get system config path")?;
             (newconfig, path)

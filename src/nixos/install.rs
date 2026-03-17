@@ -68,7 +68,7 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
                 pkgs_to_install,
             )?;
             let path = config
-                .systemconfig
+                .system_config_file
                 .clone()
                 .context("Failed to get system config path")?;
             (newconfig, path)

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::config::configfile::get_config;
@@ -43,28 +43,16 @@ pub fn read_home(path: &Path) -> Result<HomeConfigFile> {
 
 pub fn system_config_file_path() -> Result<String> {
     let config = get_config()?;
-    if let Some(ref path) = config.system_config_file {
-        return Ok(path.clone());
-    }
-    if let Some(ref sys) = config.systemconfig
-        && let Some(parent) = Path::new(sys).parent()
-    {
-        return Ok(parent.join("system.toml").to_string_lossy().to_string());
-    }
-    Err(anyhow!("Cannot determine system TOML config path"))
+    config
+        .system_config_file
+        .context("No system config file path configured")
 }
 
 pub fn home_config_file_path() -> Result<String> {
     let config = get_config()?;
-    if let Some(ref path) = config.home_config_file {
-        return Ok(path.clone());
-    }
-    if let Some(ref home) = config.homeconfig
-        && let Some(parent) = Path::new(home).parent()
-    {
-        return Ok(parent.join("home.toml").to_string_lossy().to_string());
-    }
-    Err(anyhow!("Cannot determine home TOML config path"))
+    config
+        .home_config_file
+        .context("No home config file path configured")
 }
 
 pub fn current_user() -> Result<String> {

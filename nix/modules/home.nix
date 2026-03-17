@@ -23,12 +23,11 @@ let
   configJson = builtins.toJSON (
     lib.filterAttrs (_: v: v != null) {
       inherit (cfg)
-        homeconfig
+        home_config_file
         flake
         host
         generations
         ;
-      home_config_file = cfg.home_config_file;
       mode = "toml";
     }
   );
@@ -39,12 +38,6 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = "Path to the home-manager TOML config file.";
-    };
-
-    homeconfig = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Path to the home-manager configuration file.";
     };
 
     flake = lib.mkOption {

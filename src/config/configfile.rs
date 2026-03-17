@@ -1,5 +1,5 @@
 use crate::{CONFIG, CONFIGDIR, HOME, SYSCONFIG};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -18,10 +18,14 @@ pub enum ConfigMode {
 /// Struct containing locations of system configuration files and some user configuration.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Default)]
 pub struct LibSnowConfig {
-    /// Path to the NixOS configuration file. Typically `/etc/nixos/configuration.nix`.
-    pub systemconfig: Option<String>,
-    /// Path to home-manager configuration file. Typically `~/.config/nixpkgs/home.nix`.
-    pub homeconfig: Option<String>,
+    /// Path to the system config file.
+    /// In `Nix` mode this points to a `.nix` file.
+    /// In `Toml` mode this points to a `.toml` file.
+    pub system_config_file: Option<String>,
+    /// Path to the home-manager config file.
+    /// In `Nix` mode this points to a `.nix` file.
+    /// In `Toml` mode this points to a `.toml` file.
+    pub home_config_file: Option<String>,
     /// Path to the NixOS flake file. Typically `/etc/nixos/flake.nix`.
     pub flake: Option<String>,
     /// Specifies which configuration should be used from the `nixosConfigurations` attribute set in the flake file.
@@ -33,10 +37,6 @@ pub struct LibSnowConfig {
     /// Whether packages are managed via Nix files or a TOML packages file.
     #[serde(default)]
     pub mode: ConfigMode,
-    /// Path to the system TOML config file. Only used when `mode` is `Toml`.
-    pub system_config_file: Option<String>,
-    /// Path to the home-manager TOML config file. Only used when `mode` is `Toml`.
-    pub home_config_file: Option<String>,
     /// Whether home-manager is configured as part of the system config or seperately.
     #[serde(default)]
     pub system_for_home_manager: bool,
@@ -54,7 +54,7 @@ impl LibSnowConfig {
 
     pub fn read_system_config_file(&self) -> Result<String> {
         let path = self
-            .systemconfig
+            .system_config_file
             .clone()
             .context("No system config file found")?;
         Ok(fs::read_to_string(path)?)
@@ -62,7 +62,7 @@ impl LibSnowConfig {
 
     pub fn read_home_config_file(&self) -> Result<String> {
         let path = self
-            .homeconfig
+            .home_config_file
             .clone()
             .context("No home config file found")?;
         Ok(fs::read_to_string(path)?)
@@ -88,23 +88,15 @@ impl LibSnowConfig {
     }
 
     pub fn nixos_configured(&self) -> bool {
-        match self.mode {
-            ConfigMode::Nix => self.systemconfig.is_some(),
-            ConfigMode::Toml => self.system_config_file.is_some(),
-        }
+        self.system_config_file.is_some()
     }
 
     pub fn home_manager_configured(&self) -> bool {
-        match self.mode {
-            ConfigMode::Nix => self.homeconfig.is_some(),
-            ConfigMode::Toml => self.home_config_file.is_some(),
-        }
+        self.home_config_file.is_some()
     }
 
     pub fn merge(self, other: LibSnowConfig) -> LibSnowConfig {
         LibSnowConfig {
-            systemconfig: other.systemconfig.or(self.systemconfig),
-            homeconfig: other.homeconfig.or(self.homeconfig),
             flake: other.flake.or(self.flake),
             host: other.host.or(self.host),
             generations: other.generations.or(self.generations),
