@@ -21,10 +21,10 @@ jobs:
           - nixpkgs
           - nixos/unstable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::355467543131:role/libsnowUploadRole
           aws-region: ${{ env.AWS_REGION }}
@@ -33,7 +33,7 @@ jobs:
         uses: canidae-solutions/lix-quick-install-action@main
 
       - name: Cache Nix store
-        uses: nix-community/cache-nix-action@v6
+        uses: nix-community/cache-nix-action@v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
