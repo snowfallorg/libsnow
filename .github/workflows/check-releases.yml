@@ -1,0 +1,53 @@
+name: Check for new nixpkgs releases
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+env:
+  S3_BUCKET: libsnow
+  AWS_REGION: us-east-1
+
+jobs:
+  check:
+    name: Check for new releases
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: write
+    steps:
+      - name: Random delay
+        if: github.event_name == 'schedule'
+        run: sleep $((RANDOM % 300))
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::355467543131:role/libsnowUploadRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check for new revisions
+        id: check
+        run: |
+          NEW_FOUND=false
+
+          for CHANNEL_URL in nixos-unstable nixpkgs-unstable; do
+            GIT_REV=$(curl -sfL "https://channels.nixos.org/${CHANNEL_URL}/git-revision" || true)
+            GIT_REV=$(echo "${GIT_REV}" | tr -d '[:space:]')
+            if [ -z "${GIT_REV}" ]; then continue; fi
+
+            if ! aws s3api head-object --bucket "${S3_BUCKET}" --key "db/${GIT_REV}" >/dev/null 2>&1; then
+              echo "New revision: ${CHANNEL_URL} -> ${GIT_REV}"
+              NEW_FOUND=true
+            fi
+          done
+
+          echo "new_found=${NEW_FOUND}" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger database generation
+        if: steps.check.outputs.new_found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run generate-db.yml --repo "${{ github.repository }}"
