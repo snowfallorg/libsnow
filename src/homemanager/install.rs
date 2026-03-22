@@ -67,21 +67,13 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
                 }
             }
             if !arr_pkgs.is_empty() {
-                if let Ok(withvals) =
-                    nix_editor::read::getwithvalue(&current, "home.packages")
+                if let Ok(withvals) = nix_editor::read::getwithvalue(&current, "home.packages")
                     && !withvals.contains(&String::from("pkgs"))
                 {
-                    arr_pkgs = arr_pkgs
-                        .iter()
-                        .map(|x| format!("pkgs.{}", x))
-                        .collect();
+                    arr_pkgs = arr_pkgs.iter().map(|x| format!("pkgs.{}", x)).collect();
                 }
-                current = nix_editor::write::addtoarr(
-                    &current,
-                    "home.packages",
-                    arr_pkgs,
-                )
-                .map_err(|e| anyhow!("{}", e))?;
+                current = nix_editor::write::addtoarr(&current, "home.packages", arr_pkgs)
+                    .map_err(|e| anyhow!("{}", e))?;
             }
             let path = config
                 .home_config_file

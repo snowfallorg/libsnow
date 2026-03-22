@@ -58,8 +58,8 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
             for attr in &pkgs_to_remove {
                 let key = format!("programs.{}.enable", attr);
                 if nix_editor::read::readvalue(&current, &key).is_ok() {
-                    current = nix_editor::write::deref(&current, &key)
-                        .map_err(|e| anyhow!("{}", e))?;
+                    current =
+                        nix_editor::write::deref(&current, &key).map_err(|e| anyhow!("{}", e))?;
                 } else {
                     arr_pkgs.push(attr.clone());
                 }
@@ -69,17 +69,11 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
                     nix_editor::read::getwithvalue(&current, "environment.systemPackages")
                     && !withvals.contains(&String::from("pkgs"))
                 {
-                    arr_pkgs = arr_pkgs
-                        .iter()
-                        .map(|x| format!("pkgs.{}", x))
-                        .collect();
+                    arr_pkgs = arr_pkgs.iter().map(|x| format!("pkgs.{}", x)).collect();
                 }
-                current = nix_editor::write::rmarr(
-                    &current,
-                    "environment.systemPackages",
-                    arr_pkgs,
-                )
-                .map_err(|e| anyhow!("{}", e))?;
+                current =
+                    nix_editor::write::rmarr(&current, "environment.systemPackages", arr_pkgs)
+                        .map_err(|e| anyhow!("{}", e))?;
             }
             let path = config
                 .system_config_file

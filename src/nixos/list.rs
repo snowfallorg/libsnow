@@ -36,10 +36,11 @@ pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
                 .collect();
             for name in md.all_program_option_attrs() {
                 let key = format!("programs.{}.enable", name);
-                if let Ok(val) = nix_editor::read::readvalue(&content, &key) {
-                    if val.trim() == "true" && !attrs.contains(&name) {
-                        attrs.push(name);
-                    }
+                if let Ok(val) = nix_editor::read::readvalue(&content, &key)
+                    && val.trim() == "true"
+                    && !attrs.contains(&name)
+                {
+                    attrs.push(name);
                 }
             }
             attrs

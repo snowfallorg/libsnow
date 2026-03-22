@@ -1,5 +1,6 @@
 use crate::{
-    HELPER_EXEC, PackageUpdate, config::configfile::get_config, homemanager::list::list, metadata::Metadata, nixos::AuthMethod, utils
+    HELPER_EXEC, PackageUpdate, config::configfile::get_config, homemanager::list::list,
+    metadata::Metadata, nixos::AuthMethod, utils,
 };
 use anyhow::Result;
 use log::debug;

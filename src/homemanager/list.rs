@@ -16,9 +16,7 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
             let path = tomlcfg::home_config_file_path()?;
             let pf = tomlcfg::read_home(std::path::Path::new(&path))?;
             let section = pf.users.get(&user);
-            let mut attrs = section
-                .map(|s| s.packages.clone())
-                .unwrap_or_default();
+            let mut attrs = section.map(|s| s.packages.clone()).unwrap_or_default();
             if let Some(section) = section {
                 for key in section.options.keys() {
                     if let Some(rest) = key.strip_prefix("programs.")
@@ -41,10 +39,11 @@ pub fn list(md: &Metadata) -> Result<Vec<Package>> {
                 .collect();
             for name in md.all_hm_program_option_attrs() {
                 let key = format!("programs.{}.enable", name);
-                if let Ok(val) = nix_editor::read::readvalue(&content, &key) {
-                    if val.trim() == "true" && !attrs.contains(&name) {
-                        attrs.push(name);
-                    }
+                if let Ok(val) = nix_editor::read::readvalue(&content, &key)
+                    && val.trim() == "true"
+                    && !attrs.contains(&name)
+                {
+                    attrs.push(name);
                 }
             }
             attrs

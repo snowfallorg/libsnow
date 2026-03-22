@@ -68,17 +68,11 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
                     nix_editor::read::getwithvalue(&current, "environment.systemPackages")
                     && !withvals.contains(&String::from("pkgs"))
                 {
-                    arr_pkgs = arr_pkgs
-                        .iter()
-                        .map(|x| format!("pkgs.{}", x))
-                        .collect();
+                    arr_pkgs = arr_pkgs.iter().map(|x| format!("pkgs.{}", x)).collect();
                 }
-                current = nix_editor::write::addtoarr(
-                    &current,
-                    "environment.systemPackages",
-                    arr_pkgs,
-                )
-                .map_err(|e| anyhow!("{}", e))?;
+                current =
+                    nix_editor::write::addtoarr(&current, "environment.systemPackages", arr_pkgs)
+                        .map_err(|e| anyhow!("{}", e))?;
             }
             let path = config
                 .system_config_file

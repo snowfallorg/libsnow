@@ -1,5 +1,5 @@
 use crate::{CONFIG, CONFIGDIR, HOME, SYSCONFIG};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},

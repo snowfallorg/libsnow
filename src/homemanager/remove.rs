@@ -1,5 +1,10 @@
 use crate::{
-    HELPER_EXEC, config::configfile::{self, ConfigMode}, homemanager::list::list, metadata::Metadata, nixos::AuthMethod, toml as tomlcfg
+    HELPER_EXEC,
+    config::configfile::{self, ConfigMode},
+    homemanager::list::list,
+    metadata::Metadata,
+    nixos::AuthMethod,
+    toml as tomlcfg,
 };
 use anyhow::{Context, Result, anyhow};
 use log::debug;
@@ -57,28 +62,20 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
             for attr in &pkgs_to_remove {
                 let key = format!("programs.{}.enable", attr);
                 if nix_editor::read::readvalue(&current, &key).is_ok() {
-                    current = nix_editor::write::deref(&current, &key)
-                        .map_err(|e| anyhow!("{}", e))?;
+                    current =
+                        nix_editor::write::deref(&current, &key).map_err(|e| anyhow!("{}", e))?;
                 } else {
                     arr_pkgs.push(attr.clone());
                 }
             }
             if !arr_pkgs.is_empty() {
-                if let Ok(withvals) =
-                    nix_editor::read::getwithvalue(&current, "home.packages")
+                if let Ok(withvals) = nix_editor::read::getwithvalue(&current, "home.packages")
                     && !withvals.contains(&String::from("pkgs"))
                 {
-                    arr_pkgs = arr_pkgs
-                        .iter()
-                        .map(|x| format!("pkgs.{}", x))
-                        .collect();
+                    arr_pkgs = arr_pkgs.iter().map(|x| format!("pkgs.{}", x)).collect();
                 }
-                current = nix_editor::write::rmarr(
-                    &current,
-                    "home.packages",
-                    arr_pkgs,
-                )
-                .map_err(|e| anyhow!("{}", e))?;
+                current = nix_editor::write::rmarr(&current, "home.packages", arr_pkgs)
+                    .map_err(|e| anyhow!("{}", e))?;
             }
             let path = config
                 .home_config_file
@@ -104,20 +101,20 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
     })
     .arg("--output")
     .arg(&output_path)
-        .args(if let Some(generations) = config.get_generation_count() {
-            vec!["--generations".to_string(), generations.to_string()]
-        } else {
-            vec![]
-        })
-        .arg("--")
-        .arg("switch")
-        .args(if let Ok(flakedir) = config.get_flake_dir() {
-            vec!["--flake".to_string(), flakedir]
-        } else {
-            vec![]
-        })
-        .stdin(std::process::Stdio::piped())
-        .spawn()?;
+    .args(if let Some(generations) = config.get_generation_count() {
+        vec!["--generations".to_string(), generations.to_string()]
+    } else {
+        vec![]
+    })
+    .arg("--")
+    .arg("switch")
+    .args(if let Ok(flakedir) = config.get_flake_dir() {
+        vec!["--flake".to_string(), flakedir]
+    } else {
+        vec![]
+    })
+    .stdin(std::process::Stdio::piped())
+    .spawn()?;
     output
         .stdin
         .as_mut()
