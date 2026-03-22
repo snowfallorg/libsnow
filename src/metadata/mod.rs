@@ -25,6 +25,10 @@ pub struct PkgInfo {
     pub attribute: String,
     pub pname: String,
     pub version: String,
+    pub description: Option<String>,
+    pub broken: bool,
+    pub insecure: bool,
+    pub unfree: bool,
 }
 
 impl Metadata {
@@ -101,14 +105,20 @@ impl Metadata {
 
     /// Look up a package by exact attribute name.
     pub fn get(&self, attribute: &str) -> Result<PkgInfo> {
-        let mut stmt = self
-            .conn
-            .prepare_cached("SELECT pname, version FROM pkgs WHERE attribute = ?")?;
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT p.pname, p.version, m.description, m.broken, m.insecure, m.unfree \
+             FROM pkgs p LEFT JOIN meta m ON p.attribute = m.attribute \
+             WHERE p.attribute = ?",
+        )?;
         let result = stmt.query_row([attribute], |row| {
             Ok(PkgInfo {
                 attribute: attribute.to_string(),
                 pname: row.get(0)?,
                 version: row.get(1)?,
+                description: row.get(2)?,
+                broken: row.get::<_, Option<i64>>(3)?.unwrap_or(0) != 0,
+                insecure: row.get::<_, Option<i64>>(4)?.unwrap_or(0) != 0,
+                unfree: row.get::<_, Option<i64>>(5)?.unwrap_or(0) != 0,
             })
         })?;
         Ok(result)
@@ -116,14 +126,20 @@ impl Metadata {
 
     /// Look up packages by pname.
     pub fn get_by_pname(&self, pname: &str) -> Result<Vec<PkgInfo>> {
-        let mut stmt = self
-            .conn
-            .prepare_cached("SELECT attribute, version FROM pkgs WHERE pname = ?")?;
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT p.attribute, p.version, m.description, m.broken, m.insecure, m.unfree \
+             FROM pkgs p LEFT JOIN meta m ON p.attribute = m.attribute \
+             WHERE p.pname = ?",
+        )?;
         let rows = stmt.query_map([pname], |row| {
             Ok(PkgInfo {
                 attribute: row.get(0)?,
                 pname: pname.to_string(),
                 version: row.get(1)?,
+                description: row.get(2)?,
+                broken: row.get::<_, Option<i64>>(3)?.unwrap_or(0) != 0,
+                insecure: row.get::<_, Option<i64>>(4)?.unwrap_or(0) != 0,
+                unfree: row.get::<_, Option<i64>>(5)?.unwrap_or(0) != 0,
             })
         })?;
         let mut results = Vec::new();
