@@ -4,7 +4,7 @@
   };
 
   outputs =
-    { nixpkgs, ... }:
+    { self, nixpkgs, ... }:
     let
       supportedSystems = [
         "x86_64-linux"
@@ -21,6 +21,7 @@
 
       packages = forAllSystems (pkgs: {
         libsnow-helper = pkgs.callPackage ./nix/packages/libsnow-helper.nix { };
+        generate-db = pkgs.callPackage ./nix/packages/generate-db.nix { };
       });
 
       overlays.default = _final: prev: {
@@ -28,7 +29,10 @@
       };
 
       devShells = forAllSystems (pkgs: {
-        default = pkgs.callPackage ./nix/shell.nix { };
+        default = pkgs.callPackage ./nix/shells/default.nix { };
+        ci = pkgs.callPackage ./nix/shells/ci.nix {
+          generate-db = self.packages.${pkgs.stdenv.hostPlatform.system}.generate-db;
+        };
       });
     };
 }

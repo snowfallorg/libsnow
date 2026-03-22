@@ -50,7 +50,7 @@ pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Resu
 
     let client = reqwest::Client::builder().brotli(true).build()?;
     let output = client
-        .get(format!("https://api.snowflakeos.org/libsnow/{}", rev))
+        .get(format!("https://api.snowflakeos.org/libsnow/db/{}", rev))
         .send()
         .await?;
 

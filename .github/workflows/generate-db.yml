@@ -1,0 +1,44 @@
+name: Generate and upload package databases
+
+on:
+  workflow_dispatch:
+
+env:
+  S3_BUCKET: libsnow
+  AWS_REGION: us-east-1
+
+jobs:
+  generate:
+    name: Generate DBs
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        channel:
+          - nixpkgs
+          - nixos/unstable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::355467543131:role/libsnowUploadRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Lix
+        uses: canidae-solutions/lix-quick-install-action@main
+
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+
+      - name: Discover and generate databases
+        run: >
+          nix develop .#ci --command
+          ./scripts/generate-and-upload.sh "${{ matrix.channel }}" --bucket "${S3_BUCKET}"
