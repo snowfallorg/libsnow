@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use libsnow::metadata::{build_search_index_in_dir, index_dir_for_db_path};
 use log::info;
+use regex::Regex;
 use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::Value;
@@ -236,6 +237,106 @@ fn fetch_hm_program_options(channel: &str) -> Result<HashMap<String, HashMap<Str
     Ok(programs)
 }
 
+#[derive(Debug, Clone)]
+struct ParsedAlias {
+    alias: String,
+    alias_type: String,
+    replacement: Option<String>,
+    message: Option<String>,
+}
+
+async fn fetch_aliases(git_rev: &str) -> Result<Vec<ParsedAlias>> {
+    let url = format!(
+        "https://raw.githubusercontent.com/NixOS/nixpkgs/{}/pkgs/top-level/aliases.nix",
+        git_rev
+    );
+
+    info!("Fetching aliases from {}", url);
+
+    let body = reqwest::get(&url)
+        .await?
+        .error_for_status()
+        .context("Failed to fetch aliases.nix")?
+        .text()
+        .await?;
+    let aliases = parse_aliases(&body);
+
+    info!("Parsed {} aliases", aliases.len());
+    Ok(aliases)
+}
+
+fn parse_aliases(source: &str) -> Vec<ParsedAlias> {
+    let re_throw_double =
+        Regex::new(r#"^\s+([\w._-]+)\s*=\s*throw\s+"((?:[^"\\]|\\.)*)"\s*;"#).unwrap();
+
+    let re_throw_indent =
+        Regex::new(r#"^\s+([\w._-]+)\s*=\s*throw\s+''((?:[^']|'[^'])*)''\s*;"#).unwrap();
+
+    let re_warn_alias =
+        Regex::new(r#"^\s+([\w._-]+)\s*=\s*warnAlias\s+"((?:[^"\\]|\\.)*)"\s+([\w._-]+)\s*;"#)
+            .unwrap();
+
+    let re_simple = Regex::new(r#"^\s+([\w._-]+)\s*=\s+([\w._-]+)\s*;\s*(?:#.*)?$"#).unwrap();
+
+    let mut aliases = Vec::new();
+    let mut in_block = false;
+
+    for line in source.lines() {
+        if !in_block {
+            if line.trim_start().starts_with("mapAliases {") || line.contains("mapAliases {") {
+                in_block = true;
+            }
+            continue;
+        }
+
+        if let Some(caps) = re_throw_double.captures(line) {
+            aliases.push(ParsedAlias {
+                alias: caps[1].to_string(),
+                alias_type: "removed".to_string(),
+                replacement: None,
+                message: Some(caps[2].to_string()),
+            });
+            continue;
+        }
+
+        if let Some(caps) = re_throw_indent.captures(line) {
+            let msg = caps[2].trim().to_string();
+            aliases.push(ParsedAlias {
+                alias: caps[1].to_string(),
+                alias_type: "removed".to_string(),
+                replacement: None,
+                message: Some(msg),
+            });
+            continue;
+        }
+
+        if let Some(caps) = re_warn_alias.captures(line) {
+            aliases.push(ParsedAlias {
+                alias: caps[1].to_string(),
+                alias_type: "rename".to_string(),
+                replacement: Some(caps[3].to_string()),
+                message: Some(caps[2].to_string()),
+            });
+            continue;
+        }
+
+        if let Some(caps) = re_simple.captures(line) {
+            let name = &caps[1];
+            let target = &caps[2];
+            if target != "throw" && target != "warnAlias" && target != name {
+                aliases.push(ParsedAlias {
+                    alias: name.to_string(),
+                    alias_type: "rename".to_string(),
+                    replacement: Some(target.to_string()),
+                    message: None,
+                });
+            }
+        }
+    }
+
+    aliases
+}
+
 async fn fetch_git_revision(channel: &str, release: &str) -> Result<String> {
     let url = format!(
         "https://releases.nixos.org/{}/{}/git-revision",
@@ -249,6 +350,7 @@ fn create_database(
     packages: &HashMap<String, Package>,
     program_options: &HashMap<String, HashMap<String, Value>>,
     hm_program_options: &HashMap<String, HashMap<String, Value>>,
+    aliases: &[ParsedAlias],
     db_path: &str,
 ) -> Result<()> {
     // Remove old db if present
@@ -311,6 +413,17 @@ fn create_database(
         [],
     )?;
 
+    conn.execute(
+        r#"CREATE TABLE aliases (
+            "alias" TEXT NOT NULL UNIQUE,
+            "type" TEXT NOT NULL,
+            "replacement" TEXT,
+            "message" TEXT,
+            PRIMARY KEY("alias")
+        )"#,
+        [],
+    )?;
+
     conn.execute(r#"CREATE INDEX "idx_pkgs" ON "pkgs" ("attribute")"#, [])?;
     conn.execute(r#"CREATE INDEX "idx_meta" ON "meta" ("attribute")"#, [])?;
     conn.execute(
@@ -321,6 +434,7 @@ fn create_database(
         r#"CREATE INDEX "idx_hm_program_options" ON "hm_program_options" ("attribute")"#,
         [],
     )?;
+    conn.execute(r#"CREATE INDEX "idx_aliases" ON "aliases" ("alias")"#, [])?;
 
     // Insert in a single transaction for speed
     conn.execute_batch("BEGIN")?;
@@ -403,6 +517,20 @@ fn create_database(
         }
     }
 
+    {
+        let mut alias_stmt = conn.prepare(
+            "INSERT OR IGNORE INTO aliases (alias, type, replacement, message) VALUES (?1, ?2, ?3, ?4)",
+        )?;
+        for a in aliases {
+            alias_stmt.execute(rusqlite::params![
+                a.alias,
+                a.alias_type,
+                a.replacement,
+                a.message,
+            ])?;
+        }
+    }
+
     conn.execute_batch("COMMIT")?;
 
     info!("Database written to {}", db_path);
@@ -456,10 +584,17 @@ async fn main() -> Result<()> {
 
     let program_options = fetch_program_options(channel, &release).await?;
     let hm_program_options = fetch_hm_program_options(channel)?;
+    let aliases = fetch_aliases(&git_rev).await?;
 
     // Build the database
     let db_path = format!("{}/{}.db", args.output, git_rev);
-    create_database(&packages, &program_options, &hm_program_options, &db_path)?;
+    create_database(
+        &packages,
+        &program_options,
+        &hm_program_options,
+        &aliases,
+        &db_path,
+    )?;
     if args.with_index {
         info!("Building search index ...");
         create_search_index(&db_path)?;

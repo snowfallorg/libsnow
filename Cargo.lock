@@ -1293,6 +1293,7 @@ dependencies = [
  "pretty_env_logger",
  "quick-xml",
  "rayon",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde",

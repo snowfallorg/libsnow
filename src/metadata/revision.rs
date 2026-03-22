@@ -125,7 +125,7 @@ pub(crate) async fn get_latest_nixpkgs_revision() -> Result<RevisionInfo> {
             let output = output.json::<GhResponse>().await?;
             Ok(RevisionInfo {
                 nixpkgs_revision: output.sha,
-                nixos_release: Some(release),
+                nixos_release: Some("unstable".to_string()),
             })
         }
     } else {

@@ -20,6 +20,23 @@ pub struct Metadata {
     nixos_release: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AliasKind {
+    Rename {
+        replacement: String,
+        message: Option<String>,
+    },
+    Removed {
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct AliasInfo {
+    pub attribute: String,
+    pub kind: AliasKind,
+}
+
 #[derive(Debug, Clone)]
 pub struct PkgInfo {
     pub attribute: String,
@@ -187,6 +204,34 @@ impl Metadata {
             .prepare_cached("SELECT 1 FROM hm_program_options WHERE attribute = ?")
             .and_then(|mut stmt| stmt.exists([attribute]))
             .unwrap_or(false)
+    }
+
+    /// Look up an alias by the deprecated attribute name.
+    pub fn get_alias(&self, attribute: &str) -> Option<AliasInfo> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT type, replacement, message FROM aliases WHERE alias = ?")
+            .ok()?;
+        stmt.query_row([attribute], |row| {
+            let type_str: String = row.get(0)?;
+            let replacement: Option<String> = row.get(1)?;
+            let message: Option<String> = row.get(2)?;
+            let kind = if type_str == "rename" {
+                AliasKind::Rename {
+                    replacement: replacement.unwrap_or_default(),
+                    message,
+                }
+            } else {
+                AliasKind::Removed {
+                    message: message.unwrap_or_default(),
+                }
+            };
+            Ok(AliasInfo {
+                attribute: attribute.to_string(),
+                kind,
+            })
+        })
+        .ok()
     }
 
     pub fn nixpkgs_revision(&self) -> Option<&str> {
