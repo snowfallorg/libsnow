@@ -7,6 +7,17 @@ use log::debug;
 use tokio::process::Command;
 
 pub async fn remove(pkgs: &[&str]) -> Result<()> {
+    let mut child = remove_spawn(pkgs)?;
+    let status = child.wait().await?;
+    debug!("{}", status);
+    if !status.success() {
+        Err(anyhow!("Failed to remove packages"))
+    } else {
+        Ok(())
+    }
+}
+
+pub fn remove_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
     let list = list()?
         .into_iter()
         .map(|x| match x.attr {
@@ -29,12 +40,11 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
         return Err(anyhow!("No packages to remove"));
     }
 
-    let output = Command::new("nix")
+    let child = Command::new("nix")
         .arg("profile")
         .arg("remove")
         .args(pkgs_to_remove)
-        .status()
-        .await?;
-    debug!("{}", output);
-    Ok(())
+        .spawn()?;
+
+    Ok(child)
 }

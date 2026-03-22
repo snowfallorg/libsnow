@@ -3,6 +3,16 @@ use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
 pub async fn install(pkgs: &[&str]) -> Result<()> {
+    let mut child = install_spawn(pkgs)?;
+    let status = child.wait().await?;
+    if !status.success() {
+        Err(anyhow!("Failed to install packages"))
+    } else {
+        Ok(())
+    }
+}
+
+pub fn install_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
     let installed = list()?;
     let mut pkgs_to_install = Vec::new();
     for pkg in pkgs {
@@ -22,7 +32,7 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
         return Err(anyhow!("No new packages to install"));
     }
 
-    let status = Command::new("nix")
+    let child = Command::new("nix")
         .arg("--extra-experimental-features")
         .arg("nix-command flakes")
         .arg("profile")
@@ -35,12 +45,7 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
             }
         }))
         .arg("--impure")
-        .status()
-        .await?;
+        .spawn()?;
 
-    if !status.success() {
-        Err(anyhow!("Failed to install packages"))
-    } else {
-        Ok(())
-    }
+    Ok(child)
 }
