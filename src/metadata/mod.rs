@@ -16,6 +16,8 @@ pub struct Metadata {
     conn: rusqlite::Connection,
     searcher: DbSearcher,
     db_path: PathBuf,
+    nixpkgs_revision: Option<String>,
+    nixos_release: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,21 +52,35 @@ impl Metadata {
             conn,
             searcher,
             db_path: db_path.to_path_buf(),
+            nixpkgs_revision: None,
+            nixos_release: None,
         })
     }
 
     /// Connect to the current nixpkgs revision database.
     pub async fn connect() -> Result<Self> {
-        let rev = revision::get_revision().await?;
-        let path = database::fetch_database(&rev, database::DatabaseCacheEntry::Current).await?;
-        Self::open(Path::new(&path))
+        let info = revision::get_revision().await?;
+        let path = database::fetch_database(
+            &info.nixpkgs_revision,
+            database::DatabaseCacheEntry::Current,
+        )
+        .await?;
+        let mut md = Self::open(Path::new(&path))?;
+        md.nixpkgs_revision = Some(info.nixpkgs_revision);
+        md.nixos_release = info.nixos_release;
+        Ok(md)
     }
 
     /// Connect to the latest nixpkgs revision database.
     pub async fn connect_latest() -> Result<Self> {
-        let rev = revision::get_latest_nixpkgs_revision().await?;
-        let path = database::fetch_database(&rev, database::DatabaseCacheEntry::New).await?;
-        Self::open(Path::new(&path))
+        let info = revision::get_latest_nixpkgs_revision().await?;
+        let path =
+            database::fetch_database(&info.nixpkgs_revision, database::DatabaseCacheEntry::New)
+                .await?;
+        let mut md = Self::open(Path::new(&path))?;
+        md.nixpkgs_revision = Some(info.nixpkgs_revision);
+        md.nixos_release = info.nixos_release;
+        Ok(md)
     }
 
     pub fn search(
@@ -155,6 +171,14 @@ impl Metadata {
             .prepare_cached("SELECT 1 FROM hm_program_options WHERE attribute = ?")
             .and_then(|mut stmt| stmt.exists([attribute]))
             .unwrap_or(false)
+    }
+
+    pub fn nixpkgs_revision(&self) -> Option<&str> {
+        self.nixpkgs_revision.as_deref()
+    }
+
+    pub fn nixos_release(&self) -> Option<&str> {
+        self.nixos_release.as_deref()
     }
 
     pub fn db_path(&self) -> &Path {

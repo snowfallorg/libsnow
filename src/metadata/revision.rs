@@ -5,7 +5,7 @@ use tokio::process::Command;
 use crate::IS_NIXOS;
 
 #[derive(Debug, Deserialize)]
-struct NixosVersion {
+struct NixosVersionJson {
     #[serde(rename = "nixpkgsRevision")]
     nixpkgs_revision: String,
     #[serde(rename = "nixosVersion")]
@@ -17,12 +17,28 @@ struct GhResponse {
     sha: String,
 }
 
-pub(crate) async fn get_revision() -> Result<String> {
+#[derive(Debug, Clone)]
+pub(crate) struct RevisionInfo {
+    pub nixpkgs_revision: String,
+    pub nixos_release: Option<String>,
+}
+
+pub(crate) async fn get_revision() -> Result<RevisionInfo> {
     if *IS_NIXOS {
         let output = Command::new("nixos-version").arg("--json").output().await?;
         let output = String::from_utf8(output.stdout)?;
-        let version: NixosVersion = serde_json::from_str(&output)?;
-        Ok(version.nixpkgs_revision)
+        let version: NixosVersionJson = serde_json::from_str(&output)?;
+        // 24.11.12345678.abcdefg -> 24.11
+        let release = version
+            .nixos_version
+            .split('.')
+            .take(2)
+            .collect::<Vec<_>>()
+            .join(".");
+        Ok(RevisionInfo {
+            nixpkgs_revision: version.nixpkgs_revision,
+            nixos_release: Some(release),
+        })
     } else {
         let output = Command::new("nix")
             .arg("registry")
@@ -56,19 +72,22 @@ pub(crate) async fn get_revision() -> Result<String> {
                     .await?
                     .json::<GhResponse>()
                     .await?;
-                Ok(output.sha)
+                Ok(RevisionInfo {
+                    nixpkgs_revision: output.sha,
+                    nixos_release: None,
+                })
             }
             _ => Err(anyhow!("Invalid nixpkgs flake path")),
         }
     }
 }
 
-pub(crate) async fn get_latest_nixpkgs_revision() -> Result<String> {
+pub(crate) async fn get_latest_nixpkgs_revision() -> Result<RevisionInfo> {
     if *IS_NIXOS {
         let output = Command::new("nixos-version").arg("--json").output().await?;
         let output = String::from_utf8(output.stdout)?;
 
-        let version: NixosVersion = serde_json::from_str(&output)?;
+        let version: NixosVersionJson = serde_json::from_str(&output)?;
 
         // 24.11.12345678.abcdefg -> 24.11
         let mut release = version
@@ -93,7 +112,10 @@ pub(crate) async fn get_latest_nixpkgs_revision() -> Result<String> {
 
         if output.status().is_success() {
             let output = output.json::<GhResponse>().await?;
-            Ok(output.sha)
+            Ok(RevisionInfo {
+                nixpkgs_revision: output.sha,
+                nixos_release: Some(release),
+            })
         } else {
             let output = reqwest::Client::new()
                 .get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixos-unstable")
@@ -101,7 +123,10 @@ pub(crate) async fn get_latest_nixpkgs_revision() -> Result<String> {
                 .send()
                 .await?;
             let output = output.json::<GhResponse>().await?;
-            Ok(output.sha)
+            Ok(RevisionInfo {
+                nixpkgs_revision: output.sha,
+                nixos_release: Some(release),
+            })
         }
     } else {
         let output = reqwest::Client::new()
@@ -110,6 +135,9 @@ pub(crate) async fn get_latest_nixpkgs_revision() -> Result<String> {
             .send()
             .await?;
         let output = output.json::<GhResponse>().await?;
-        Ok(output.sha)
+        Ok(RevisionInfo {
+            nixpkgs_revision: output.sha,
+            nixos_release: Some("unstable".to_string()),
+        })
     }
 }
