@@ -7,10 +7,18 @@ use anyhow::{Result, anyhow};
 use log::debug;
 use tokio::process::Command;
 
+/// Check for available updates against the latest nixpkgs revision
 pub async fn updatable() -> Result<Vec<PackageUpdate>> {
     utils::misc::updatable(list()?).await
 }
 
+/// Check for available updates against the user's current nixpkgs revision
+pub async fn updatable_user() -> Result<Vec<PackageUpdate>> {
+    utils::misc::updatable_user(list()?).await
+}
+
+/// Check for available updates by running `nix eval` per package
+/// Support non-nixpkgs packages
 pub async fn updatable_all() -> Result<Vec<PackageUpdate>> {
     let installed = list()?;
     let mut updatable = vec![];

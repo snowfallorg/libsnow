@@ -92,6 +92,20 @@ impl Metadata {
         Ok(md)
     }
 
+    /// Connect to the nixpkgs revision from the user's nix registry.
+    pub async fn connect_registry() -> Result<Self> {
+        let info = revision::get_registry_revision().await?;
+        let path = database::fetch_database(
+            &info.nixpkgs_revision,
+            database::DatabaseCacheEntry::Current,
+        )
+        .await?;
+        let mut md = Self::open(Path::new(&path))?;
+        md.nixpkgs_revision = Some(info.nixpkgs_revision);
+        md.nixos_release = info.nixos_release;
+        Ok(md)
+    }
+
     /// Connect to the latest nixpkgs revision database.
     pub async fn connect_latest() -> Result<Self> {
         let info = revision::get_latest_nixpkgs_revision().await?;

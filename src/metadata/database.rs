@@ -48,6 +48,24 @@ pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Resu
         return Ok(outpath);
     }
 
+    match download_database(rev, &outpath).await {
+        Ok(()) => {
+            cleanup(&outpath, &cachejson).await?;
+            Ok(outpath)
+        }
+        Err(err) => {
+            log::warn!("Failed to fetch database for rev {rev}: {err}");
+            if let Some(fallback) = find_newest_cached_db().await {
+                log::info!("Falling back to cached database: {}", fallback);
+                Ok(fallback)
+            } else {
+                Err(err)
+            }
+        }
+    }
+}
+
+async fn download_database(rev: &str, outpath: &str) -> Result<()> {
     let client = reqwest::Client::builder().brotli(true).build()?;
     let output = client
         .get(format!("https://api.snowflakeos.org/libsnow/db/{}", rev))
@@ -59,12 +77,43 @@ pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Resu
         return Err(anyhow!("Failed to fetch database: {}", status));
     }
 
-    fs::create_dir_all(PathBuf::from(&outpath).parent().context("Invalid path")?).await?;
-    fs::write(&outpath, output.bytes().await?).await?;
+    fs::create_dir_all(PathBuf::from(outpath).parent().context("Invalid path")?).await?;
+    let bytes = output.bytes().await.context(format!(
+        "Failed to decode database response for rev {rev}. Database may not be available yet."
+    ))?;
 
-    cleanup(&outpath, &cachejson).await?;
+    if bytes.len() < 16 || &bytes[..16] != b"SQLite format 3\0" {
+        return Err(anyhow!(
+            "Downloaded file is not a valid SQLite database (rev: {})",
+            rev
+        ));
+    }
 
-    Ok(outpath)
+    fs::write(outpath, &bytes).await?;
+    Ok(())
+}
+
+async fn find_newest_cached_db() -> Option<String> {
+    let cache_dir = format!("{}/.cache/libsnow/", std::env::var("HOME").ok()?);
+    let mut entries = fs::read_dir(&cache_dir).await.ok()?;
+    let mut newest: Option<(std::time::SystemTime, String)> = None;
+
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("db") {
+            continue;
+        }
+        if let Ok(meta) = entry.metadata().await
+            && let Ok(modified) = meta.modified()
+        {
+            let path_str = path.to_string_lossy().to_string();
+            if newest.as_ref().is_none_or(|(t, _)| modified > *t) {
+                newest = Some((modified, path_str));
+            }
+        }
+    }
+
+    newest.map(|(_, p)| p)
 }
 
 async fn cleanup(outpath: &str, cachejson: &DatabaseCache) -> Result<()> {

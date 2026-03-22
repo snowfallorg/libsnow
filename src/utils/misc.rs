@@ -39,13 +39,22 @@ pub fn get_pname_version_from_storepath(path: &str) -> Result<(String, Option<St
 }
 
 pub async fn updatable(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
+    let md = Metadata::connect_latest().await?;
+    compare_installed(&md, installed)
+}
+
+pub async fn updatable_user(installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
+    let md = Metadata::connect_registry().await?;
+    compare_installed(&md, installed)
+}
+
+fn compare_installed(md: &Metadata, installed: Vec<Package>) -> Result<Vec<PackageUpdate>> {
     let mut updatable = vec![];
-    let new_md = Metadata::connect_latest().await?;
 
     for pkg in installed {
         match &pkg.attr {
             PackageAttr::NixPkgs { attr } => {
-                if let Ok(info) = new_md.get(attr)
+                if let Ok(info) = md.get(attr)
                     && let Ok((_pname, Some(version))) =
                         get_pname_version(&format!("{}-{}", info.pname, info.version))
                 {

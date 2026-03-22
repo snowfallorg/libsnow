@@ -82,6 +82,106 @@ pub(crate) async fn get_revision() -> Result<RevisionInfo> {
     }
 }
 
+pub(crate) async fn get_registry_revision() -> Result<RevisionInfo> {
+    let output = Command::new("nix")
+        .arg("registry")
+        .arg("list")
+        .output()
+        .await?;
+    let output = String::from_utf8(output.stdout)?;
+
+    let priority = |scope: &str| -> u8 {
+        match scope {
+            "user" => 0,
+            "system" => 1,
+            "global" => 2,
+            _ => 3,
+        }
+    };
+
+    let mut entries: Vec<(u8, &str)> = output
+        .lines()
+        .filter(|line| line.contains("flake:nixpkgs "))
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                Some((priority(parts[0]), parts[2]))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    entries.sort_by_key(|(p, _)| *p);
+
+    let (_, url) = entries
+        .first()
+        .context("No nixpkgs flake found in registry")?;
+
+    if url.starts_with("github:NixOS/nixpkgs/") {
+        let parts: Vec<&str> = url.split('/').collect();
+        let channel = *parts.last().context("Invalid github path")?;
+
+        if let Some(rev_part) = channel.split('?').find(|p| p.starts_with("rev=")) {
+            let rev = rev_part.strip_prefix("rev=").unwrap();
+            return Ok(RevisionInfo {
+                nixpkgs_revision: rev.to_string(),
+                nixos_release: None,
+            });
+        }
+
+        let channel = channel.split('?').next().unwrap_or(channel);
+
+        let output = reqwest::Client::new()
+            .get(format!(
+                "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
+                channel
+            ))
+            .header(reqwest::header::USER_AGENT, "libsnow")
+            .send()
+            .await?
+            .json::<GhResponse>()
+            .await?;
+        Ok(RevisionInfo {
+            nixpkgs_revision: output.sha,
+            nixos_release: None,
+        })
+    } else if url.starts_with("path:") {
+        if *IS_NIXOS {
+            let output = Command::new("nixos-version").arg("--json").output().await?;
+            let output = String::from_utf8(output.stdout)?;
+            let version: NixosVersionJson = serde_json::from_str(&output)?;
+            let release = version
+                .nixos_version
+                .split('.')
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(".");
+            Ok(RevisionInfo {
+                nixpkgs_revision: version.nixpkgs_revision,
+                nixos_release: Some(release),
+            })
+        } else {
+            Err(anyhow!(
+                "Registry nixpkgs points to a store path but not on NixOS"
+            ))
+        }
+    } else {
+        Err(anyhow!("Unsupported nixpkgs registry entry: {}", url))
+    }
+}
+
+async fn get_channel_revision(channel: &str) -> Result<String> {
+    let url = format!("https://channels.nixos.org/{}/git-revision", channel);
+    let rev = reqwest::get(&url)
+        .await?
+        .error_for_status()
+        .context(format!("Failed to fetch channel revision for {}", channel))?
+        .text()
+        .await?;
+    Ok(rev.trim().to_string())
+}
+
 pub(crate) async fn get_latest_nixpkgs_revision() -> Result<RevisionInfo> {
     if *IS_NIXOS {
         let output = Command::new("nixos-version").arg("--json").output().await?;
@@ -90,53 +190,31 @@ pub(crate) async fn get_latest_nixpkgs_revision() -> Result<RevisionInfo> {
         let version: NixosVersionJson = serde_json::from_str(&output)?;
 
         // 24.11.12345678.abcdefg -> 24.11
-        let mut release = version
+        let release = version
             .nixos_version
             .split('.')
             .take(2)
             .collect::<Vec<_>>()
             .join(".");
 
-        if release == "24.05" {
-            release = "unstable".to_string();
-        }
-
-        let output = reqwest::Client::new()
-            .get(format!(
-                "https://api.github.com/repos/NixOS/nixpkgs/commits/nixos-{}",
-                release
-            ))
-            .header(reqwest::header::USER_AGENT, "libsnow")
-            .send()
-            .await?;
-
-        if output.status().is_success() {
-            let output = output.json::<GhResponse>().await?;
-            Ok(RevisionInfo {
-                nixpkgs_revision: output.sha,
+        let channel = format!("nixos-{}", release);
+        match get_channel_revision(&channel).await {
+            Ok(rev) => Ok(RevisionInfo {
+                nixpkgs_revision: rev,
                 nixos_release: Some(release),
-            })
-        } else {
-            let output = reqwest::Client::new()
-                .get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixos-unstable")
-                .header(reqwest::header::USER_AGENT, "libsnow")
-                .send()
-                .await?;
-            let output = output.json::<GhResponse>().await?;
-            Ok(RevisionInfo {
-                nixpkgs_revision: output.sha,
-                nixos_release: Some("unstable".to_string()),
-            })
+            }),
+            Err(_) => {
+                let rev = get_channel_revision("nixos-unstable").await?;
+                Ok(RevisionInfo {
+                    nixpkgs_revision: rev,
+                    nixos_release: Some(release),
+                })
+            }
         }
     } else {
-        let output = reqwest::Client::new()
-            .get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixpkgs-unstable")
-            .header(reqwest::header::USER_AGENT, "libsnow")
-            .send()
-            .await?;
-        let output = output.json::<GhResponse>().await?;
+        let rev = get_channel_revision("nixpkgs-unstable").await?;
         Ok(RevisionInfo {
-            nixpkgs_revision: output.sha,
+            nixpkgs_revision: rev,
             nixos_release: Some("unstable".to_string()),
         })
     }
