@@ -3,6 +3,10 @@ name: Generate and upload package databases
 on:
   workflow_dispatch:
 
+concurrency:
+  group: generate-db
+  cancel-in-progress: false
+
 env:
   S3_BUCKET: libsnow
   AWS_REGION: us-east-1
