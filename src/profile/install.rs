@@ -1,4 +1,4 @@
-use crate::{PackageAttr, profile::list::list};
+use crate::{NIX_BACKEND, NixBackend, PackageAttr, profile::list::list};
 use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
@@ -32,11 +32,16 @@ pub fn install_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
         return Err(anyhow!("No new packages to install"));
     }
 
+    let subcmd = match *NIX_BACKEND {
+        NixBackend::Nix => "add",
+        NixBackend::Lix => "install",
+    };
+
     let child = Command::new("nix")
         .arg("--extra-experimental-features")
         .arg("nix-command flakes")
         .arg("profile")
-        .arg("install")
+        .arg(subcmd)
         .args(pkgs_to_install.iter().map(|x| {
             if x.contains('#') || x.contains(':') {
                 x.to_string()

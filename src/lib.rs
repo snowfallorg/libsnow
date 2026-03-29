@@ -86,6 +86,31 @@ pub fn get_eval_arch() -> Result<String> {
     Ok(stdout)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixBackend {
+    Nix,
+    Lix,
+}
+
+impl fmt::Display for NixBackend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NixBackend::Nix => write!(f, "Nix"),
+            NixBackend::Lix => write!(f, "Lix"),
+        }
+    }
+}
+
+pub fn detect_nix_backend() -> Result<NixBackend> {
+    let output = Command::new("nix").arg("--version").output()?;
+    let version_str = String::from_utf8(output.stdout)?;
+    if version_str.contains("Lix") {
+        Ok(NixBackend::Lix)
+    } else {
+        Ok(NixBackend::Nix)
+    }
+}
+
 fn get_arch() -> String {
     if let Ok(arch) = get_nixos_arch() {
         return arch;
@@ -106,6 +131,7 @@ lazy_static::lazy_static! {
     pub static ref CONFIG: String = format!("{}/config.json", &*CONFIGDIR);
     pub static ref HOME: String = std::env::var("HOME").unwrap();
     pub static ref IS_NIXOS: bool = std::path::Path::new("/etc/NIXOS").exists();
+    pub static ref NIX_BACKEND: NixBackend = detect_nix_backend().unwrap_or(NixBackend::Nix);
 }
 static SYSCONFIG: &str = "/etc/libsnow/config.json";
 static HELPER_EXEC: &str = "libsnow-helper";

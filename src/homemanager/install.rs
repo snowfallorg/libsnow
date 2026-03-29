@@ -12,6 +12,20 @@ use tokio::io::AsyncWriteExt;
 use toml::Value as TomlValue;
 
 pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
+    let mut child = install_spawn(pkgs, md, auth_method).await?;
+    let status = child.wait().await?;
+    debug!("{}", status);
+    if !status.success() {
+        return Err(anyhow!("Failed to rebuild"));
+    }
+    Ok(())
+}
+
+pub async fn install_spawn(
+    pkgs: &[&str],
+    md: &Metadata,
+    auth_method: AuthMethod<'_>,
+) -> Result<tokio::process::Child> {
     let config = configfile::get_config()?;
 
     let installed: Vec<String> = list(md)
@@ -83,7 +97,7 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
         }
     };
 
-    let mut output = tokio::process::Command::new(if config.system_for_home_manager {
+    let mut child = tokio::process::Command::new(if config.system_for_home_manager {
         match auth_method {
             AuthMethod::Pkexec => "pkexec",
             AuthMethod::Sudo => "sudo",
@@ -113,14 +127,15 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
     })
     .stdin(std::process::Stdio::piped())
     .spawn()?;
-    output
+
+    child
         .stdin
         .as_mut()
         .ok_or("stdin not available")
         .unwrap()
         .write_all(content.as_bytes())
         .await?;
-    let output = output.wait().await?;
-    debug!("{}", output);
-    Ok(())
+    child.stdin.take();
+
+    Ok(child)
 }

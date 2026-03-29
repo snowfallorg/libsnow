@@ -1,5 +1,5 @@
 use crate::{
-    PackageAttr, PackageUpdate,
+    NIX_BACKEND, NixBackend, PackageAttr, PackageUpdate,
     profile::list::{list, name_from_attr},
     utils,
 };
@@ -76,6 +76,16 @@ pub async fn updatable_all() -> Result<Vec<PackageUpdate>> {
 }
 
 pub async fn update(pkgs: &[&str]) -> Result<()> {
+    let mut child = update_spawn(pkgs)?;
+    let status = child.wait().await?;
+    debug!("{}", status);
+    if !status.success() {
+        return Err(anyhow!("Failed to update packages"));
+    }
+    Ok(())
+}
+
+pub fn update_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
     let list = list()?
         .into_iter()
         .map(|x| x.attr.to_string())
@@ -87,7 +97,7 @@ pub async fn update(pkgs: &[&str]) -> Result<()> {
                 pkgs_to_update.push(name);
             }
         } else {
-            println!("Package {} is not installed", pkg);
+            debug!("Package {} is not installed", pkg);
         }
     }
 
@@ -95,23 +105,42 @@ pub async fn update(pkgs: &[&str]) -> Result<()> {
         return Err(anyhow!("No packages to update"));
     }
 
-    let output = Command::new("nix")
+    let child = Command::new("nix")
+        .arg("--extra-experimental-features")
+        .arg("nix-command flakes")
         .arg("profile")
         .arg("upgrade")
         .args(pkgs_to_update)
-        .status()
-        .await?;
-    debug!("{}", output);
-    Ok(())
+        .arg("--impure")
+        .spawn()?;
+
+    Ok(child)
 }
 
 pub async fn update_all() -> Result<()> {
-    let output = Command::new("nix")
+    let mut child = update_all_spawn()?;
+    let status = child.wait().await?;
+    debug!("{}", status);
+    if !status.success() {
+        return Err(anyhow!("Failed to update packages"));
+    }
+    Ok(())
+}
+
+pub fn update_all_spawn() -> Result<tokio::process::Child> {
+    let upgrade_all_arg = match *NIX_BACKEND {
+        NixBackend::Nix => "--all",
+        NixBackend::Lix => ".*",
+    };
+
+    let child = Command::new("nix")
+        .arg("--extra-experimental-features")
+        .arg("nix-command flakes")
         .arg("profile")
         .arg("upgrade")
-        .arg("--all")
-        .status()
-        .await?;
-    debug!("{}", output);
-    Ok(())
+        .arg(upgrade_all_arg)
+        .arg("--impure")
+        .spawn()?;
+
+    Ok(child)
 }

@@ -1,13 +1,23 @@
 use crate::{HELPER_EXEC, config::configfile::get_config, nixos::AuthMethod};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use log::debug;
 
 pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
+    let mut child = rebuild_spawn(auth_method)?;
+    let status = child.wait().await?;
+    debug!("{}", status);
+    if !status.success() {
+        return Err(anyhow!("Failed to rebuild"));
+    }
+    Ok(())
+}
+
+pub fn rebuild_spawn(auth_method: AuthMethod<'_>) -> Result<tokio::process::Child> {
     let config = get_config()?;
     if config.system_for_home_manager {
-        return crate::nixos::rebuild::rebuild(auth_method).await;
+        return crate::nixos::rebuild::rebuild_spawn(auth_method);
     };
-    let output = tokio::process::Command::new(HELPER_EXEC)
+    let child = tokio::process::Command::new(HELPER_EXEC)
         .arg("rebuild-home")
         .args(if let Some(generations) = config.get_generation_count() {
             vec!["--generations".to_string(), generations.to_string()]
@@ -21,8 +31,7 @@ pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
         } else {
             vec![]
         })
-        .status()
-        .await?;
-    debug!("{}", output);
-    Ok(())
+        .spawn()?;
+
+    Ok(child)
 }
