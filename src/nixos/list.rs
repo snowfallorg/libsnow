@@ -1,7 +1,5 @@
-use anyhow::Result;
-
 use crate::{
-    Package, PackageAttr,
+    Error, Package, PackageAttr, Result,
     config::configfile::{self, ConfigMode},
     metadata::Metadata,
     toml as tomlcfg,
@@ -29,7 +27,11 @@ pub fn list_systempackages(md: &Metadata) -> Result<Vec<Package>> {
         ConfigMode::Nix => {
             let content = config.read_system_config_file()?;
             let system_packages =
-                nix_editor::read::getarrvals(&content, "environment.systemPackages")?;
+                nix_editor::read::getarrvals(&content, "environment.systemPackages").map_err(
+                    |e| Error::NixEditor {
+                        reason: e.to_string(),
+                    },
+                )?;
             let mut attrs: Vec<String> = system_packages
                 .iter()
                 .map(|x| x.strip_prefix("pkgs.").unwrap_or(x).to_string())

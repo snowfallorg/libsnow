@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use crate::{Package, PackageAttr, Result, metadata::Metadata};
 use serde::Deserialize;
-
-use crate::{Package, PackageAttr, metadata::Metadata};
 
 #[derive(Debug, Deserialize, Clone)]
 struct EnvPackage {

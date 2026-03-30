@@ -1,5 +1,5 @@
 use crate::{
-    HELPER_EXEC,
+    Error, HELPER_EXEC, Result,
     config::configfile::{self, ConfigMode, LibSnowConfig},
     dbus,
     homemanager::list::list,
@@ -7,7 +7,6 @@ use crate::{
     nixos::AuthMethod,
     toml as tomlcfg,
 };
-use anyhow::{Context, Result, anyhow};
 use tokio::io::AsyncWriteExt;
 use toml::Value as TomlValue;
 use tracing::debug;
@@ -20,7 +19,9 @@ pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) 
             let status = child.wait().await?;
             debug!("{}", status);
             if !status.success() {
-                return Err(anyhow!("Failed to rebuild"));
+                return Err(Error::SubprocessFailed {
+                    reason: "failed to rebuild".into(),
+                });
             }
             Ok(())
         }
@@ -61,7 +62,9 @@ fn prepare_install(
     }
 
     if pkgs_to_install.is_empty() {
-        return Err(anyhow!("No new packages to install"));
+        return Err(Error::NothingToDo {
+            reason: "no new packages to install".into(),
+        });
     }
 
     let (content, output_path) = match config.mode {
@@ -89,8 +92,11 @@ fn prepare_install(
             for attr in &pkgs_to_install {
                 if md.has_hm_program_option(attr) {
                     let key = format!("programs.{}.enable", attr);
-                    current = nix_editor::write::write(&current, &key, "true")
-                        .map_err(|e| anyhow!("{}", e))?;
+                    current = nix_editor::write::write(&current, &key, "true").map_err(|e| {
+                        Error::NixEditor {
+                            reason: e.to_string(),
+                        }
+                    })?;
                 } else {
                     arr_pkgs.push(attr.clone());
                 }
@@ -102,12 +108,16 @@ fn prepare_install(
                     arr_pkgs = arr_pkgs.iter().map(|x| format!("pkgs.{}", x)).collect();
                 }
                 current = nix_editor::write::addtoarr(&current, "home.packages", arr_pkgs)
-                    .map_err(|e| anyhow!("{}", e))?;
+                    .map_err(|e| Error::NixEditor {
+                        reason: e.to_string(),
+                    })?;
             }
             let path = config
                 .home_config_file
                 .clone()
-                .context("Failed to get home config path")?;
+                .ok_or_else(|| Error::Config {
+                    reason: "failed to get home config path".into(),
+                })?;
             (current, path)
         }
     };

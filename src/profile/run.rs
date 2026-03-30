@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use crate::{Error, Result};
 use tokio::process::Command;
 
 pub async fn run(pkg: &str, args: &[&str]) -> Result<()> {
@@ -18,7 +18,9 @@ pub async fn run(pkg: &str, args: &[&str]) -> Result<()> {
         .await?;
 
     if !status.success() {
-        Err(anyhow!("Failed to install packages"))
+        Err(Error::SubprocessFailed {
+            reason: "failed to run package".into(),
+        })
     } else {
         Ok(())
     }

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::Result;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use std::{fs, path::Path};
@@ -51,7 +51,9 @@ pub struct SearchResult {
     pub score: f32,
 }
 
-fn deserialize_string_option<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+fn deserialize_string_option<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -74,7 +76,7 @@ where
     }
 }
 
-fn deserialize_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+fn deserialize_string<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -97,7 +99,7 @@ where
     }
 }
 
-fn deserialize_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+fn deserialize_bool<'de, D>(deserializer: D) -> std::result::Result<bool, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -185,38 +187,18 @@ fn build_schema() -> (Schema, SearchFields) {
 }
 
 fn fields_from_schema(schema: &Schema) -> Result<SearchFields> {
-    let attr_ngram = schema
-        .get_field("attribute")
-        .context("missing field: attribute")?;
-    let version = schema
-        .get_field("version")
-        .context("missing field: version")?;
-    let pname = schema.get_field("pname").context("missing field: pname")?;
-    let description = schema
-        .get_field("description")
-        .context("missing field: description")?;
-    let broken = schema
-        .get_field("broken")
-        .context("missing field: broken")?;
-    let insecure = schema
-        .get_field("insecure")
-        .context("missing field: insecure")?;
-    let unfree = schema
-        .get_field("unfree")
-        .context("missing field: unfree")?;
+    let attr_ngram = schema.get_field("attribute")?;
+    let version = schema.get_field("version")?;
+    let pname = schema.get_field("pname")?;
+    let description = schema.get_field("description")?;
+    let broken = schema.get_field("broken")?;
+    let insecure = schema.get_field("insecure")?;
+    let unfree = schema.get_field("unfree")?;
 
-    let attr_exact = schema
-        .get_field("attribute_exact")
-        .context("missing field: attribute_exact")?;
-    let attr_default = schema
-        .get_field("attribute_default")
-        .context("missing field: attribute_default")?;
-    let pname_default = schema
-        .get_field("pname_default")
-        .context("missing field: pname_default")?;
-    let desc_default = schema
-        .get_field("description_default")
-        .context("missing field: description_default")?;
+    let attr_exact = schema.get_field("attribute_exact")?;
+    let attr_default = schema.get_field("attribute_default")?;
+    let pname_default = schema.get_field("pname_default")?;
+    let desc_default = schema.get_field("description_default")?;
 
     Ok(SearchFields {
         attr_ngram,

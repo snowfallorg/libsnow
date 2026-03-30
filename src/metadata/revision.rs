@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use crate::{Error, Result};
 use serde::Deserialize;
 use tokio::process::Command;
 
@@ -50,18 +50,24 @@ pub(crate) async fn get_revision() -> Result<RevisionInfo> {
         let line = lines
             .iter()
             .find(|x| x.contains("global flake:nixpkgs"))
-            .context("No nixpkgs flake found")?;
+            .ok_or_else(|| Error::NixRegistry {
+                reason: "no nixpkgs flake found".into(),
+            })?;
         let path = line
             .split(' ')
             .collect::<Vec<_>>()
             .get(2)
-            .context("Invalid registry entry")?
+            .ok_or_else(|| Error::NixRegistry {
+                reason: "invalid registry entry".into(),
+            })?
             .to_string();
 
         match path {
             x if x.starts_with("github:NixOS/nixpkgs/") => {
                 let parts = x.split('/').collect::<Vec<_>>();
-                let channel = parts.last().context("Invalid github path")?;
+                let channel = parts.last().ok_or_else(|| Error::NixRegistry {
+                    reason: "invalid github path".into(),
+                })?;
                 let output = reqwest::Client::new()
                     .get(format!(
                         "https://api.github.com/repos/NixOS/nixpkgs/commits/{}",
@@ -77,7 +83,9 @@ pub(crate) async fn get_revision() -> Result<RevisionInfo> {
                     nixos_release: None,
                 })
             }
-            _ => Err(anyhow!("Invalid nixpkgs flake path")),
+            _ => Err(Error::NixRegistry {
+                reason: "invalid nixpkgs flake path".into(),
+            }),
         }
     }
 }
@@ -114,13 +122,15 @@ pub(crate) async fn get_registry_revision() -> Result<RevisionInfo> {
 
     entries.sort_by_key(|(p, _)| *p);
 
-    let (_, url) = entries
-        .first()
-        .context("No nixpkgs flake found in registry")?;
+    let (_, url) = entries.first().ok_or_else(|| Error::NixRegistry {
+        reason: "no nixpkgs flake found in registry".into(),
+    })?;
 
     if url.starts_with("github:NixOS/nixpkgs/") {
         let parts: Vec<&str> = url.split('/').collect();
-        let channel = *parts.last().context("Invalid github path")?;
+        let channel = *parts.last().ok_or_else(|| Error::NixRegistry {
+            reason: "invalid github path".into(),
+        })?;
 
         if let Some(rev_part) = channel.split('?').find(|p| p.starts_with("rev=")) {
             let rev = rev_part.strip_prefix("rev=").unwrap();
@@ -162,23 +172,21 @@ pub(crate) async fn get_registry_revision() -> Result<RevisionInfo> {
                 nixos_release: Some(release),
             })
         } else {
-            Err(anyhow!(
-                "Registry nixpkgs points to a store path but not on NixOS"
-            ))
+            Err(Error::NixRegistry {
+                reason: "registry nixpkgs points to a store path but not on NixOS".into(),
+            })
         }
     } else {
-        Err(anyhow!("Unsupported nixpkgs registry entry: {}", url))
+        Err(Error::NixRegistry {
+            reason: format!("unsupported nixpkgs registry entry: {}", url),
+        })
     }
 }
 
 async fn get_channel_revision(channel: &str) -> Result<String> {
     let url = format!("https://channels.nixos.org/{}/git-revision", channel);
-    let rev = reqwest::get(&url)
-        .await?
-        .error_for_status()
-        .context(format!("Failed to fetch channel revision for {}", channel))?
-        .text()
-        .await?;
+    let resp = reqwest::get(&url).await?.error_for_status()?;
+    let rev = resp.text().await?;
     Ok(rev.trim().to_string())
 }
 

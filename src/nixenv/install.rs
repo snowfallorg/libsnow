@@ -1,6 +1,5 @@
 use super::{get_channel, list::list};
-use crate::{PackageAttr, metadata::Metadata};
-use anyhow::{Result, anyhow};
+use crate::{Error, PackageAttr, Result, metadata::Metadata};
 use tokio::process::Command;
 
 pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
@@ -18,7 +17,9 @@ pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
     }
 
     if pkgs_to_install.is_empty() {
-        return Err(anyhow!("No new packages to install"));
+        return Err(Error::NothingToDo {
+            reason: "no new packages to install".into(),
+        });
     }
 
     let channel = get_channel()?;
@@ -29,7 +30,9 @@ pub async fn install(pkgs: &[&str], md: &Metadata) -> Result<()> {
         .await?;
 
     if !status.success() {
-        Err(anyhow!("Failed to install packages"))
+        Err(Error::SubprocessFailed {
+            reason: "failed to install packages".into(),
+        })
     } else {
         Ok(())
     }

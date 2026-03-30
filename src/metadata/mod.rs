@@ -4,7 +4,7 @@ pub(crate) mod search;
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::Result;
 use tracing::info;
 
 use search::{DbSearcher, SearchQuery, get_searcher_from_dir};

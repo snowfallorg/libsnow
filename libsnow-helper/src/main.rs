@@ -1,6 +1,7 @@
 mod dbus;
 mod operations;
 
+use anyhow::Result;
 use clap::{self, FromArgMatches, Subcommand};
 
 #[derive(Subcommand, Debug)]
@@ -84,86 +85,49 @@ fn main() {
         .map_err(|err| err.exit())
         .unwrap();
 
-    match derived_subcommands {
+    if let Err(err) = run(derived_subcommands) {
+        eprintln!("{err}");
+        std::process::exit(1);
+    }
+}
+
+fn run(cmd: SubCommands) -> Result<()> {
+    match cmd {
         SubCommands::Dbus { session } => {
             operations::enable_process_groups();
-            let result = if session {
+            if session {
                 async_io::block_on(dbus::run_session_daemon())
             } else {
                 async_io::block_on(dbus::run_system_daemon())
-            };
-            if let Err(err) = result {
-                eprintln!("D-Bus daemon error: {}", err);
-                std::process::exit(1);
             }
         }
         SubCommands::Config {
             output,
             generations,
             arguments,
-        } => {
-            match operations::write_file(&output, arguments, generations, None) {
-                Ok(_) => (),
-                Err(err) => {
-                    eprintln!("{}", err);
-                    std::process::exit(1);
-                }
-            };
-        }
+        } => operations::write_file(&output, arguments, generations, None),
         SubCommands::Update {
             flake,
             generations,
             arguments,
-        } => match operations::update(&flake, arguments, generations) {
-            Ok(_) => (),
-            Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
-            }
-        },
+        } => operations::update(&flake, arguments, generations),
         SubCommands::Rebuild {
             generations,
             arguments,
-        } => match operations::rebuild(arguments, generations) {
-            Ok(_) => (),
-            Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
-            }
-        },
+        } => operations::rebuild(arguments, generations),
         SubCommands::ConfigHome {
             output,
             generations,
             arguments,
-        } => {
-            match operations::write_file_home(&output, arguments, generations, None) {
-                Ok(_) => (),
-                Err(err) => {
-                    eprintln!("{}", err);
-                    std::process::exit(1);
-                }
-            };
-        }
+        } => operations::write_file_home(&output, arguments, generations, None),
         SubCommands::UpdateHome {
             flake,
             generations,
             arguments,
-        } => match operations::update_home(&flake, arguments, generations) {
-            Ok(_) => (),
-            Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
-            }
-        },
+        } => operations::update_home(&flake, arguments, generations),
         SubCommands::RebuildHome {
             generations,
             arguments,
-        } => match operations::rebuild_home(arguments, generations) {
-            Ok(_) => (),
-            Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
-            }
-        },
+        } => operations::rebuild_home(arguments, generations),
     }
 }

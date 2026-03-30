@@ -1,5 +1,6 @@
-use crate::{NIXARCH, Package, PackageAttr, utils::misc::get_pname_version_from_storepath};
-use anyhow::{Context, Result};
+use crate::{
+    Error, NIXARCH, Package, PackageAttr, Result, utils::misc::get_pname_version_from_storepath,
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 use tracing::debug;
@@ -77,7 +78,9 @@ pub fn name_from_attr(attr: &str) -> Result<String> {
         match pkg.attr {
             PackageAttr::NixPkgs { attr: x } => {
                 if x == attr {
-                    return pkg.profile_name.context("Profile name not found");
+                    return pkg.profile_name.ok_or_else(|| Error::Config {
+                        reason: "profile name not found".into(),
+                    });
                 }
             }
             PackageAttr::External {
@@ -87,10 +90,14 @@ pub fn name_from_attr(attr: &str) -> Result<String> {
                 if attr == format!("{}#{}", url, ext_attr)
                     || (ext_attr.ends_with(".default") && url == attr)
                 {
-                    return pkg.profile_name.context("Profile name not found");
+                    return pkg.profile_name.ok_or_else(|| Error::Config {
+                        reason: "profile name not found".into(),
+                    });
                 }
             }
         }
     }
-    Err(anyhow::anyhow!("Package not found"))
+    Err(Error::PackageNotFound {
+        attr: attr.to_string(),
+    })
 }

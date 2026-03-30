@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::config::configfile::get_config;
@@ -30,31 +30,29 @@ pub struct Section {
 }
 
 pub fn read_system(path: &Path) -> Result<SystemConfigFile> {
-    let content =
-        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let content = fs::read_to_string(path)?;
     Ok(toml::from_str(&content)?)
 }
 
 pub fn read_home(path: &Path) -> Result<HomeConfigFile> {
-    let content =
-        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let content = fs::read_to_string(path)?;
     Ok(toml::from_str(&content)?)
 }
 
 pub fn system_config_file_path() -> Result<String> {
     let config = get_config()?;
-    config
-        .system_config_file
-        .context("No system config file path configured")
+    config.system_config_file.ok_or_else(|| Error::Config {
+        reason: "no system config file path configured".into(),
+    })
 }
 
 pub fn home_config_file_path() -> Result<String> {
     let config = get_config()?;
-    config
-        .home_config_file
-        .context("No home config file path configured")
+    config.home_config_file.ok_or_else(|| Error::Config {
+        reason: "no home config file path configured".into(),
+    })
 }
 
 pub fn current_user() -> Result<String> {
-    std::env::var("USER").context("$USER not set")
+    Ok(std::env::var("USER")?)
 }

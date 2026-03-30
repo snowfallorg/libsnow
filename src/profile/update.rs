@@ -1,9 +1,8 @@
 use crate::{
-    NIX_BACKEND, NixBackend, PackageAttr, PackageUpdate,
+    Error, NIX_BACKEND, NixBackend, PackageAttr, PackageUpdate, Result,
     profile::list::{list, name_from_attr},
     utils,
 };
-use anyhow::{Result, anyhow};
 use tokio::process::Command;
 use tracing::debug;
 
@@ -80,7 +79,9 @@ pub async fn update(pkgs: &[&str]) -> Result<()> {
     let status = child.wait().await?;
     debug!("{}", status);
     if !status.success() {
-        return Err(anyhow!("Failed to update packages"));
+        return Err(Error::SubprocessFailed {
+            reason: "failed to update packages".into(),
+        });
     }
     Ok(())
 }
@@ -102,7 +103,9 @@ pub fn update_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
     }
 
     if pkgs_to_update.is_empty() {
-        return Err(anyhow!("No packages to update"));
+        return Err(Error::NothingToDo {
+            reason: "no packages to update".into(),
+        });
     }
 
     let child = Command::new("nix")
@@ -122,7 +125,9 @@ pub async fn update_all() -> Result<()> {
     let status = child.wait().await?;
     debug!("{}", status);
     if !status.success() {
-        return Err(anyhow!("Failed to update packages"));
+        return Err(Error::SubprocessFailed {
+            reason: "failed to update packages".into(),
+        });
     }
     Ok(())
 }

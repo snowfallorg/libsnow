@@ -1,8 +1,7 @@
 use crate::{
-    PackageAttr,
+    Error, PackageAttr, Result,
     profile::list::{list, name_from_attr},
 };
-use anyhow::{Result, anyhow};
 use tokio::process::Command;
 use tracing::debug;
 
@@ -11,7 +10,9 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
     let status = child.wait().await?;
     debug!("{}", status);
     if !status.success() {
-        Err(anyhow!("Failed to remove packages"))
+        Err(Error::SubprocessFailed {
+            reason: "failed to remove packages".into(),
+        })
     } else {
         Ok(())
     }
@@ -37,7 +38,9 @@ pub fn remove_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
     }
 
     if pkgs_to_remove.is_empty() {
-        return Err(anyhow!("No packages to remove"));
+        return Err(Error::NothingToDo {
+            reason: "no packages to remove".into(),
+        });
     }
 
     let child = Command::new("nix")

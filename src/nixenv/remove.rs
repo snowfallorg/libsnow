@@ -1,6 +1,5 @@
 use super::list::list;
-use crate::{PackageAttr, metadata::Metadata};
-use anyhow::{Result, anyhow};
+use crate::{Error, PackageAttr, Result, metadata::Metadata};
 use tokio::process::Command;
 
 pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
@@ -22,7 +21,9 @@ pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
     }
 
     if pkgs_to_remove.is_empty() {
-        return Err(anyhow!("No packages to remove"));
+        return Err(Error::NothingToDo {
+            reason: "no packages to remove".into(),
+        });
     }
 
     let status = Command::new("nix-env")
@@ -32,7 +33,9 @@ pub async fn remove(pkgs: &[&str], md: &Metadata) -> Result<()> {
         .await?;
 
     if !status.success() {
-        Err(anyhow!("Failed to install packages"))
+        Err(Error::SubprocessFailed {
+            reason: "failed to remove packages".into(),
+        })
     } else {
         Ok(())
     }

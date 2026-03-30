@@ -1,12 +1,13 @@
-use crate::{NIX_BACKEND, NixBackend, PackageAttr, profile::list::list};
-use anyhow::{Result, anyhow};
+use crate::{Error, NIX_BACKEND, NixBackend, PackageAttr, Result, profile::list::list};
 use tokio::process::Command;
 
 pub async fn install(pkgs: &[&str]) -> Result<()> {
     let mut child = install_spawn(pkgs)?;
     let status = child.wait().await?;
     if !status.success() {
-        Err(anyhow!("Failed to install packages"))
+        Err(Error::SubprocessFailed {
+            reason: "failed to install packages".into(),
+        })
     } else {
         Ok(())
     }
@@ -29,7 +30,9 @@ pub fn install_spawn(pkgs: &[&str]) -> Result<tokio::process::Child> {
     }
 
     if pkgs_to_install.is_empty() {
-        return Err(anyhow!("No new packages to install"));
+        return Err(Error::NothingToDo {
+            reason: "no new packages to install".into(),
+        });
     }
 
     let subcmd = match *NIX_BACKEND {

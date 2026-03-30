@@ -1,6 +1,5 @@
 use super::AuthMethod;
-use crate::{HELPER_EXEC, config::configfile::get_config, dbus};
-use anyhow::{Result, anyhow};
+use crate::{Error, HELPER_EXEC, Result, config::configfile::get_config, dbus};
 use tracing::debug;
 
 pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
@@ -11,7 +10,9 @@ pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
             let status = child.wait().await?;
             debug!("{}", status);
             if !status.success() {
-                return Err(anyhow!("Failed to rebuild"));
+                return Err(Error::SubprocessFailed {
+                    reason: "failed to rebuild".into(),
+                });
             }
             Ok(())
         }

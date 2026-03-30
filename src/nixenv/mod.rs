@@ -3,7 +3,7 @@ pub mod list;
 pub mod remove;
 pub mod update;
 
-use anyhow::{Context, Result};
+use crate::{Error, Result};
 use std::process::Command;
 
 pub fn get_channel() -> Result<String> {
@@ -14,7 +14,9 @@ pub fn get_channel() -> Result<String> {
         .collect::<Vec<_>>()
         .iter()
         .find(|x| x.starts_with("nixos") || x.starts_with("nixpkgs"))
-        .context("Failed to get channel")?
+        .ok_or_else(|| Error::Config {
+            reason: "failed to get channel".into(),
+        })?
         .split_whitespace()
         .collect::<Vec<_>>()[0]
         .to_string();

@@ -15,14 +15,15 @@ path = "src/bin/generate_db.rs"
 required-features = ["generate-db"]
 
 [features]
-generate-db = ["dep:clap", "dep:quick-xml", "dep:tracing-subscriber", "dep:regex"]
+generate-db = ["dep:clap", "dep:quick-xml", "dep:tracing-subscriber", "dep:regex", "dep:anyhow"]
 
 [dependencies]
 nix-editor = "0.3.0"
 reqwest = { version = "0.13", features = ["json", "brotli"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-anyhow = "1.0"
+anyhow = { version = "1.0", optional = true }
+thiserror = "2.0"
 tokio = { version = "1", features = ["full"] }
 clap = { version = "4.6", features = ["derive"], optional = true }
 tracing = "0.1"

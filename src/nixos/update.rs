@@ -1,9 +1,8 @@
 use super::AuthMethod;
 use crate::{
-    HELPER_EXEC, PackageUpdate, config::configfile::get_config, dbus, metadata::Metadata,
-    nixos::list::list_systempackages, utils,
+    Error, HELPER_EXEC, PackageUpdate, Result, config::configfile::get_config, dbus,
+    metadata::Metadata, nixos::list::list_systempackages, utils,
 };
-use anyhow::{Result, anyhow};
 use tracing::debug;
 
 pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
@@ -18,7 +17,9 @@ pub async fn update(auth_method: AuthMethod<'_>) -> Result<()> {
             let status = child.wait().await?;
             debug!("{}", status);
             if !status.success() {
-                return Err(anyhow!("Failed to rebuild"));
+                return Err(Error::SubprocessFailed {
+                    reason: "failed to rebuild".into(),
+                });
             }
             Ok(())
         }

@@ -1,5 +1,4 @@
-use crate::{CONFIG, CONFIGDIR, HOME, SYSCONFIG};
-use anyhow::{Context, Result, anyhow};
+use crate::{CONFIG, CONFIGDIR, Error, HOME, Result, SYSCONFIG};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -56,30 +55,47 @@ impl LibSnowConfig {
         let path = self
             .system_config_file
             .clone()
-            .context("No system config file found")?;
+            .ok_or_else(|| Error::Config {
+                reason: "no system config file found".into(),
+            })?;
         Ok(fs::read_to_string(path)?)
     }
 
     pub fn read_home_config_file(&self) -> Result<String> {
-        let path = self
-            .home_config_file
-            .clone()
-            .context("No home config file found")?;
+        let path = self.home_config_file.clone().ok_or_else(|| Error::Config {
+            reason: "no home config file found".into(),
+        })?;
         Ok(fs::read_to_string(path)?)
     }
 
     pub fn read_flake_file(&self) -> Result<String> {
-        let path = self.flake.clone().context("No flake file found")?;
+        let path = self.flake.clone().ok_or_else(|| Error::Config {
+            reason: "no flake file found".into(),
+        })?;
         Ok(fs::read_to_string(path)?)
     }
 
     pub fn get_flake_dir(&self) -> Result<String> {
-        let flake_file = PathBuf::from(self.flake.clone().context("No flake file found")?);
+        let flake_file = PathBuf::from(self.flake.clone().ok_or_else(|| Error::Config {
+            reason: "no flake file found".into(),
+        })?);
         if flake_file.is_dir() {
-            Ok(flake_file.to_str().context("No path found")?.to_string())
+            Ok(flake_file
+                .to_str()
+                .ok_or_else(|| Error::Config {
+                    reason: "no path found".into(),
+                })?
+                .to_string())
         } else {
-            let flake_dir = flake_file.parent().context("No parent found")?;
-            Ok(flake_dir.to_str().context("No path found")?.to_string())
+            let flake_dir = flake_file.parent().ok_or_else(|| Error::Config {
+                reason: "no parent found".into(),
+            })?;
+            Ok(flake_dir
+                .to_str()
+                .ok_or_else(|| Error::Config {
+                    reason: "no path found".into(),
+                })?
+                .to_string())
         }
     }
 
@@ -142,7 +158,9 @@ pub fn get_config() -> Result<LibSnowConfig> {
                 serde_json::from_reader(BufReader::new(File::open(SYSCONFIG)?))?;
             Ok(config)
         }
-        (false, false) => Err(anyhow!("No config file found")),
+        (false, false) => Err(Error::Config {
+            reason: "no config file found".into(),
+        }),
     }
 }
 

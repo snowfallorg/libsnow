@@ -1,9 +1,12 @@
-use crate::{ICON_UPDATER_EXEC, Package, PackageAttr, PackageUpdate, metadata::Metadata};
-use anyhow::{Context, Result};
+use crate::{
+    Error, ICON_UPDATER_EXEC, Package, PackageAttr, PackageUpdate, Result, metadata::Metadata,
+};
 use tracing::debug;
 
 pub fn get_name_from_storepath(path: &str) -> Result<String> {
-    let name = path.split('/').next_back().context("No name found")?;
+    let name = path.split('/').next_back().ok_or_else(|| Error::Config {
+        reason: "no name found in store path".into(),
+    })?;
     let name = name.split('-').skip(1).collect::<Vec<_>>().join("-");
     Ok(name)
 }

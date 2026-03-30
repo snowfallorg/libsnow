@@ -1,13 +1,12 @@
 use super::AuthMethod;
 use crate::{
-    HELPER_EXEC,
+    Error, HELPER_EXEC, Result,
     config::configfile::{self, ConfigMode, LibSnowConfig},
     dbus,
     metadata::Metadata,
     nixos::list::list_systempackages,
     toml as tomlcfg,
 };
-use anyhow::{Context, Result, anyhow};
 use tokio::io::AsyncWriteExt;
 use tracing::debug;
 
@@ -19,7 +18,9 @@ pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -
             let status = child.wait().await?;
             debug!("{}", status);
             if !status.success() {
-                return Err(anyhow!("Failed to rebuild"));
+                return Err(Error::SubprocessFailed {
+                    reason: "failed to rebuild".into(),
+                });
             }
             Ok(())
         }
@@ -55,7 +56,9 @@ fn prepare_remove(
     }
 
     if pkgs_to_remove.is_empty() {
-        return Err(anyhow!("No packages to remove"));
+        return Err(Error::NothingToDo {
+            reason: "no packages to remove".into(),
+        });
     }
 
     let (content, output_path) = match config.mode {
@@ -84,7 +87,9 @@ fn prepare_remove(
                 let key = format!("programs.{}.enable", attr);
                 if nix_editor::read::readvalue(&current, &key).is_ok() {
                     current =
-                        nix_editor::write::deref(&current, &key).map_err(|e| anyhow!("{}", e))?;
+                        nix_editor::write::deref(&current, &key).map_err(|e| Error::NixEditor {
+                            reason: e.to_string(),
+                        })?;
                 } else {
                     arr_pkgs.push(attr.clone());
                 }
@@ -98,12 +103,16 @@ fn prepare_remove(
                 }
                 current =
                     nix_editor::write::rmarr(&current, "environment.systemPackages", arr_pkgs)
-                        .map_err(|e| anyhow!("{}", e))?;
+                        .map_err(|e| Error::NixEditor {
+                            reason: e.to_string(),
+                        })?;
             }
             let path = config
                 .system_config_file
                 .clone()
-                .context("Failed to get system config path")?;
+                .ok_or_else(|| Error::Config {
+                    reason: "failed to get system config path".into(),
+                })?;
             (current, path)
         }
     };

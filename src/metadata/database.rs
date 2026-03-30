@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, anyhow};
+use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
@@ -70,19 +70,29 @@ async fn download_database(rev: &str, outpath: &str) -> Result<()> {
 
     let status = output.status();
     if !status.is_success() {
-        return Err(anyhow!("Failed to fetch database: {}", status));
+        return Err(Error::HttpStatus {
+            status: status.as_u16(),
+            reason: "failed to fetch database".into(),
+        });
     }
 
-    fs::create_dir_all(PathBuf::from(outpath).parent().context("Invalid path")?).await?;
-    let bytes = output.bytes().await.context(format!(
-        "Failed to decode database response for rev {rev}. Database may not be available yet."
-    ))?;
+    fs::create_dir_all(
+        PathBuf::from(outpath)
+            .parent()
+            .ok_or_else(|| Error::Config {
+                reason: "invalid path".into(),
+            })?,
+    )
+    .await?;
+    let bytes = output.bytes().await?;
 
     if bytes.len() < 16 || &bytes[..16] != b"SQLite format 3\0" {
-        return Err(anyhow!(
-            "Downloaded file is not a valid SQLite database (rev: {})",
-            rev
-        ));
+        return Err(Error::InvalidDatabase {
+            reason: format!(
+                "downloaded file is not a valid SQLite database (rev: {})",
+                rev
+            ),
+        });
     }
 
     fs::write(outpath, &bytes).await?;

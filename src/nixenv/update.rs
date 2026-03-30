@@ -1,6 +1,5 @@
 use super::get_channel;
-use crate::{PackageUpdate, metadata::Metadata, nixenv::list::list, utils};
-use anyhow::{Result, anyhow};
+use crate::{Error, PackageUpdate, Result, metadata::Metadata, nixenv::list::list, utils};
 
 pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
     utils::misc::updatable(list(md).await?).await
@@ -23,7 +22,9 @@ pub async fn update(pkgs: &[&str], md: &Metadata) -> Result<()> {
     }
 
     if pkgs_to_update.is_empty() {
-        return Err(anyhow!("No packages to update"));
+        return Err(Error::NothingToDo {
+            reason: "no packages to update".into(),
+        });
     }
 
     let status = tokio::process::Command::new("nix-env")
@@ -33,7 +34,9 @@ pub async fn update(pkgs: &[&str], md: &Metadata) -> Result<()> {
         .await?;
 
     if !status.success() {
-        Err(anyhow!("Failed to update packages"))
+        Err(Error::SubprocessFailed {
+            reason: "failed to update packages".into(),
+        })
     } else {
         Ok(())
     }
