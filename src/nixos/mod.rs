@@ -4,6 +4,7 @@ pub mod rebuild;
 pub mod remove;
 pub mod update;
 
+#[non_exhaustive]
 pub enum AuthMethod<'a> {
     Dbus,
     Sudo,
