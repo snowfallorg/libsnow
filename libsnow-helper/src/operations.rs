@@ -36,11 +36,63 @@ fn exit_code_str(status: &std::process::ExitStatus) -> String {
     }
 }
 
-pub fn write_file(
+fn run_cmd(cmd: &mut Command, name: &str) -> Result<()> {
+    let status = spawn_tracked(cmd)?;
+    if !status.success() {
+        return Err(anyhow!(
+            "{} failed with exit code {}",
+            name,
+            exit_code_str(&status)
+        ));
+    }
+    Ok(())
+}
+
+fn delete_generations(profile_path: &str, generations: Option<u32>) -> Result<()> {
+    if let Some(g) = generations {
+        if g > 0 {
+            run_cmd(
+                Command::new("nix-env")
+                    .arg("--delete-generations")
+                    .arg("-p")
+                    .arg(profile_path)
+                    .arg(format!("+{}", g)),
+                "nix-env --delete-generations",
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn register_restore_on_sigint(path: &str, backup: &str) {
+    let mut signals = Signals::new([SIGINT]).expect("failed to register SIGINT handler");
+    let p = path.to_string();
+    let b = backup.to_string();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == SIGINT {
+                let mut file = File::create(&p).expect("failed to restore file on SIGINT");
+                write!(file, "{}", &b).expect("failed to write backup on SIGINT");
+                std::process::exit(1);
+            }
+        }
+    });
+}
+
+fn restore_backup(path: &str, backup: &Option<String>) -> Result<()> {
+    if let Some(ref b) = backup {
+        let mut file = File::create(path)?;
+        write!(file, "{}", b)?;
+    }
+    Ok(())
+}
+
+fn write_file_impl(
     path: &str,
     args: Vec<String>,
     generations: Option<u32>,
     content: Option<String>,
+    rebuild_fn: fn(Vec<String>, Option<u32>) -> Result<()>,
 ) -> Result<()> {
     let backup = fs::read_to_string(path)?;
 
@@ -54,29 +106,12 @@ pub fn write_file(
         }
     };
 
-    // If the user sends a SIGINT, restore the original configuration file
-    {
-        let mut signals = Signals::new([SIGINT]).unwrap();
-        let p = path.to_string();
-        let b = backup.clone();
-        let handle = move || {
-            let mut file = File::create(&p).unwrap();
-            write!(file, "{}", &b).unwrap();
-        };
-        thread::spawn(move || {
-            for sig in signals.forever() {
-                if sig == SIGINT {
-                    handle();
-                    std::process::exit(1);
-                }
-            }
-        });
-    }
+    register_restore_on_sigint(path, &backup);
 
     let mut file = File::create(path)?;
     write!(file, "{}", &buf)?;
 
-    if let Err(e) = rebuild(args, generations) {
+    if let Err(e) = rebuild_fn(args, generations) {
         let mut file = File::create(path)?;
         write!(file, "{}", &backup)?;
         Err(e)
@@ -85,86 +120,13 @@ pub fn write_file(
     }
 }
 
-pub fn update(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()> {
-    let lock_path = format!("{}/flake.lock", path.trim_end_matches('/'));
-    let lock_backup = fs::read_to_string(&lock_path).ok();
-
-    // If the user sends a SIGINT, restore the original flake.lock
-    if let Some(ref backup) = lock_backup {
-        let mut signals = Signals::new([SIGINT]).unwrap();
-        let p = lock_path.clone();
-        let b = backup.clone();
-        let handle = move || {
-            let mut file = File::create(&p).unwrap();
-            write!(file, "{}", &b).unwrap();
-        };
-        thread::spawn(move || {
-            for sig in signals.forever() {
-                if sig == SIGINT {
-                    handle();
-                    std::process::exit(1);
-                }
-            }
-        });
-    }
-
-    let x = spawn_tracked(
-        Command::new("nix")
-            .arg("flake")
-            .arg("update")
-            .arg("--flake")
-            .arg(path),
-    )?;
-    if !x.success() {
-        // Restore flake.lock on update failure
-        if let Some(backup) = lock_backup {
-            let mut file = File::create(&lock_path)?;
-            write!(file, "{}", &backup)?;
-        }
-        return Err(anyhow!(
-            "nix flake update failed with exit code {}",
-            exit_code_str(&x)
-        ));
-    }
-
-    if let Err(e) = rebuild(args, generations) {
-        // Restore flake.lock on rebuild failure
-        if let Some(backup) = lock_backup {
-            let mut file = File::create(&lock_path)?;
-            write!(file, "{}", &backup)?;
-        }
-        Err(e)
-    } else {
-        Ok(())
-    }
-}
-
-pub fn rebuild(args: Vec<String>, generations: Option<u32>) -> Result<()> {
-    let x = spawn_tracked(Command::new("nixos-rebuild").args(&args))?;
-    if !x.success() {
-        return Err(anyhow!(
-            "nixos-rebuild failed with exit code {}",
-            exit_code_str(&x)
-        ));
-    }
-    if let Some(g) = generations {
-        if g > 0 {
-            let x = spawn_tracked(
-                Command::new("nix-env")
-                    .arg("--delete-generations")
-                    .arg("-p")
-                    .arg("/nix/var/nix/profiles/system")
-                    .arg(format!("+{}", g)),
-            )?;
-            if !x.success() {
-                return Err(anyhow!(
-                    "nix-env --delete-generations failed with exit code {}",
-                    exit_code_str(&x)
-                ));
-            }
-        }
-    }
-    Ok(())
+pub fn write_file(
+    path: &str,
+    args: Vec<String>,
+    generations: Option<u32>,
+    content: Option<String>,
+) -> Result<()> {
+    write_file_impl(path, args, generations, content, rebuild)
 }
 
 pub fn write_file_home(
@@ -173,129 +135,59 @@ pub fn write_file_home(
     generations: Option<u32>,
     content: Option<String>,
 ) -> Result<()> {
-    let backup = fs::read_to_string(path)?;
-
-    let buf = match content {
-        Some(c) => c,
-        None => {
-            let stdin = io::stdin();
-            let mut buf = String::new();
-            stdin.lock().read_to_string(&mut buf)?;
-            buf
-        }
-    };
-
-    // If the user sends a SIGINT, restore the original configuration file
-    {
-        let mut signals = Signals::new([SIGINT]).unwrap();
-        let p = path.to_string();
-        let b = backup.clone();
-        let handle = move || {
-            let mut file = File::create(&p).unwrap();
-            write!(file, "{}", &b).unwrap();
-        };
-        thread::spawn(move || {
-            for sig in signals.forever() {
-                if sig == SIGINT {
-                    handle();
-                    std::process::exit(1);
-                }
-            }
-        });
-    }
-
-    let mut file = File::create(path)?;
-    write!(file, "{}", &buf)?;
-
-    if let Err(e) = rebuild_home(args, generations) {
-        let mut file = File::create(path)?;
-        write!(file, "{}", &backup)?;
-        Err(e)
-    } else {
-        Ok(())
-    }
+    write_file_impl(path, args, generations, content, rebuild_home)
 }
 
-pub fn update_home(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()> {
+fn update_impl(
+    path: &str,
+    args: Vec<String>,
+    generations: Option<u32>,
+    rebuild_fn: fn(Vec<String>, Option<u32>) -> Result<()>,
+) -> Result<()> {
     let lock_path = format!("{}/flake.lock", path.trim_end_matches('/'));
     let lock_backup = fs::read_to_string(&lock_path).ok();
 
-    // If the user sends a SIGINT, restore the original flake.lock
     if let Some(ref backup) = lock_backup {
-        let mut signals = Signals::new([SIGINT]).unwrap();
-        let p = lock_path.clone();
-        let b = backup.clone();
-        let handle = move || {
-            let mut file = File::create(&p).unwrap();
-            write!(file, "{}", &b).unwrap();
-        };
-        thread::spawn(move || {
-            for sig in signals.forever() {
-                if sig == SIGINT {
-                    handle();
-                    std::process::exit(1);
-                }
-            }
-        });
+        register_restore_on_sigint(&lock_path, backup);
     }
 
-    let x = spawn_tracked(
+    if let Err(e) = run_cmd(
         Command::new("nix")
             .arg("flake")
             .arg("update")
             .arg("--flake")
             .arg(path),
-    )?;
-    if !x.success() {
-        if let Some(backup) = lock_backup {
-            let mut file = File::create(&lock_path)?;
-            write!(file, "{}", &backup)?;
-        }
-        return Err(anyhow!(
-            "nix flake update failed with exit code {}",
-            exit_code_str(&x)
-        ));
+        "nix flake update",
+    ) {
+        restore_backup(&lock_path, &lock_backup)?;
+        return Err(e);
     }
 
-    if let Err(e) = rebuild_home(args, generations) {
-        if let Some(backup) = lock_backup {
-            let mut file = File::create(&lock_path)?;
-            write!(file, "{}", &backup)?;
-        }
+    if let Err(e) = rebuild_fn(args, generations) {
+        restore_backup(&lock_path, &lock_backup)?;
         Err(e)
     } else {
         Ok(())
     }
 }
 
+pub fn update(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()> {
+    update_impl(path, args, generations, rebuild)
+}
+
+pub fn update_home(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()> {
+    update_impl(path, args, generations, rebuild_home)
+}
+
+pub fn rebuild(args: Vec<String>, generations: Option<u32>) -> Result<()> {
+    run_cmd(Command::new("nixos-rebuild").args(&args), "nixos-rebuild")?;
+    delete_generations("/nix/var/nix/profiles/system", generations)
+}
+
 pub fn rebuild_home(args: Vec<String>, generations: Option<u32>) -> Result<()> {
-    let x = spawn_tracked(Command::new("home-manager").args(&args))?;
-    if !x.success() {
-        return Err(anyhow!(
-            "home-manager failed with exit code {}",
-            exit_code_str(&x)
-        ));
-    }
-    if let Some(g) = generations {
-        if g > 0 {
-            let x = spawn_tracked(
-                Command::new("nix-env")
-                    .arg("--delete-generations")
-                    .arg("-p")
-                    .arg(
-                        dirs::home_dir()
-                            .expect("Could not determine home directory")
-                            .join(".local/state/nix/profiles/home-manager"),
-                    )
-                    .arg(format!("+{}", g)),
-            )?;
-            if !x.success() {
-                return Err(anyhow!(
-                    "nix-env --delete-generations failed with exit code {}",
-                    exit_code_str(&x)
-                ));
-            }
-        }
-    }
-    Ok(())
+    run_cmd(Command::new("home-manager").args(&args), "home-manager")?;
+    let profile_path = dirs::home_dir()
+        .expect("could not determine home directory")
+        .join(".local/state/nix/profiles/home-manager");
+    delete_generations(&profile_path.to_string_lossy(), generations)
 }
