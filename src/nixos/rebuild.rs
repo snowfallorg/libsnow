@@ -1,7 +1,7 @@
 use super::AuthMethod;
 use crate::{HELPER_EXEC, config::configfile::get_config, dbus};
 use anyhow::{Result, anyhow};
-use log::debug;
+use tracing::debug;
 
 pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
     match auth_method {

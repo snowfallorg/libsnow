@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{fmt, fs, process::Command};
+use std::{fmt, fs, process::Command, sync::LazyLock};
 
 pub mod config;
 pub mod dbus;
@@ -125,30 +125,37 @@ fn get_arch() -> String {
     panic!("Could not determine architecture");
 }
 
-lazy_static::lazy_static! {
-    pub static ref NIXARCH: String = get_arch();
-    pub static ref CACHEDIR: String = dirs::cache_dir()
+pub static NIXARCH: LazyLock<String> = LazyLock::new(get_arch);
+pub static CACHEDIR: LazyLock<String> = LazyLock::new(|| {
+    dirs::cache_dir()
         .expect("Could not determine cache directory")
         .join("libsnow")
         .to_string_lossy()
-        .to_string();
-    pub static ref CONFIGDIR: String = dirs::config_dir()
+        .to_string()
+});
+pub static CONFIGDIR: LazyLock<String> = LazyLock::new(|| {
+    dirs::config_dir()
         .expect("Could not determine config directory")
         .join("libsnow")
         .to_string_lossy()
-        .to_string();
-    pub static ref CONFIG: String = dirs::config_dir()
+        .to_string()
+});
+pub static CONFIG: LazyLock<String> = LazyLock::new(|| {
+    dirs::config_dir()
         .expect("Could not determine config directory")
         .join("libsnow/config.json")
         .to_string_lossy()
-        .to_string();
-    pub static ref HOME: String = dirs::home_dir()
+        .to_string()
+});
+pub static HOME: LazyLock<String> = LazyLock::new(|| {
+    dirs::home_dir()
         .expect("Could not determine home directory")
         .to_string_lossy()
-        .to_string();
-    pub static ref IS_NIXOS: bool = std::path::Path::new("/etc/NIXOS").exists();
-    pub static ref NIX_BACKEND: NixBackend = detect_nix_backend().unwrap_or(NixBackend::Nix);
-}
+        .to_string()
+});
+pub static IS_NIXOS: LazyLock<bool> = LazyLock::new(|| std::path::Path::new("/etc/NIXOS").exists());
+pub static NIX_BACKEND: LazyLock<NixBackend> =
+    LazyLock::new(|| detect_nix_backend().unwrap_or(NixBackend::Nix));
 static SYSCONFIG: &str = "/etc/libsnow/config.json";
 static HELPER_EXEC: &str = "libsnow-helper";
 static ICON_UPDATER_EXEC: &str = "update-icons.trigger";

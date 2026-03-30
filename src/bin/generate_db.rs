@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use clap::Parser;
 use libsnow::metadata::{build_search_index_in_dir, index_dir_for_db_path};
-use log::info;
 use regex::Regex;
 use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::Value;
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(about = "Generate the libsnow SQLite package database from nixos releases")]
@@ -549,12 +549,14 @@ fn create_search_index(db_path: &str) -> Result<()> {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    if args.verbose {
-        let mut logger = pretty_env_logger::formatted_timed_builder();
-        logger.parse_filters("generate_db=debug,info");
-        logger.try_init()?;
-    } else {
-        pretty_env_logger::try_init()?;
+    {
+        use tracing_subscriber::EnvFilter;
+        let filter = if args.verbose {
+            EnvFilter::new("generate_db=debug,info")
+        } else {
+            EnvFilter::from_default_env()
+        };
+        tracing_subscriber::fmt().with_env_filter(filter).init();
     }
 
     let channel = &args.channel;

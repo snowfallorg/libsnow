@@ -282,10 +282,11 @@ pub fn rebuild_home(args: Vec<String>, generations: Option<u32>) -> Result<()> {
                 Command::new("nix-env")
                     .arg("--delete-generations")
                     .arg("-p")
-                    .arg(format!(
-                        "{}/.local/state/nix/profiles/home-manager",
-                        std::env::var("HOME")?
-                    ))
+                    .arg(
+                        dirs::home_dir()
+                            .expect("Could not determine home directory")
+                            .join(".local/state/nix/profiles/home-manager"),
+                    )
                     .arg(format!("+{}", g)),
             )?;
             if !x.success() {

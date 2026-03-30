@@ -1,6 +1,6 @@
 use crate::{ICON_UPDATER_EXEC, Package, PackageAttr, PackageUpdate, metadata::Metadata};
 use anyhow::{Context, Result};
-use log::debug;
+use tracing::debug;
 
 pub fn get_name_from_storepath(path: &str) -> Result<String> {
     let name = path.split('/').next_back().context("No name found")?;

@@ -4,7 +4,7 @@ use crate::{
     nixos::list::list_systempackages, utils,
 };
 use anyhow::{Result, anyhow};
-use log::debug;
+use tracing::debug;
 
 pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
     utils::misc::updatable(list_systempackages(md)?).await

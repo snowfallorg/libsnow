@@ -4,8 +4,8 @@ use crate::{
     utils,
 };
 use anyhow::{Result, anyhow};
-use log::debug;
 use tokio::process::Command;
+use tracing::debug;
 
 /// Check for available updates against the latest nixpkgs revision
 pub async fn updatable() -> Result<Vec<PackageUpdate>> {

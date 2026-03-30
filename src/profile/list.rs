@@ -1,8 +1,8 @@
 use crate::{NIXARCH, Package, PackageAttr, utils::misc::get_pname_version_from_storepath};
 use anyhow::{Context, Result};
-use log::debug;
 use serde::Deserialize;
 use std::collections::HashMap;
+use tracing::debug;
 
 #[derive(Debug, Deserialize)]
 struct ProfilePkgsRoot {

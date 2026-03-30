@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use log::debug;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use std::{fs, path::Path};
@@ -8,6 +7,7 @@ use tantivy::{
     query::{BooleanQuery, BoostQuery, Occur, Query, QueryParser, TermQuery},
     schema::{IndexRecordOption, STORED, STRING, Schema, TextFieldIndexing, TextOptions},
 };
+use tracing::debug;
 
 pub struct DbSearcher {
     searcher: Searcher,

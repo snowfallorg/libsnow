@@ -8,8 +8,8 @@ use crate::{
     toml as tomlcfg,
 };
 use anyhow::{Context, Result, anyhow};
-use log::debug;
 use tokio::io::AsyncWriteExt;
+use tracing::debug;
 
 pub async fn remove(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
     match auth_method {

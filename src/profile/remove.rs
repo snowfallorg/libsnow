@@ -3,8 +3,8 @@ use crate::{
     profile::list::{list, name_from_attr},
 };
 use anyhow::{Result, anyhow};
-use log::debug;
 use tokio::process::Command;
+use tracing::debug;
 
 pub async fn remove(pkgs: &[&str]) -> Result<()> {
     let mut child = remove_spawn(pkgs)?;

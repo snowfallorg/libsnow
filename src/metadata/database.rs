@@ -50,9 +50,9 @@ pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Resu
             Ok(outpath)
         }
         Err(err) => {
-            log::warn!("Failed to fetch database for rev {rev}: {err}");
+            tracing::warn!("Failed to fetch database for rev {rev}: {err}");
             if let Some(fallback) = find_newest_cached_db().await {
-                log::info!("Falling back to cached database: {}", fallback);
+                tracing::info!("Falling back to cached database: {}", fallback);
                 Ok(fallback)
             } else {
                 Err(err)

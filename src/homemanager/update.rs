@@ -3,7 +3,7 @@ use crate::{
     metadata::Metadata, nixos::AuthMethod, utils,
 };
 use anyhow::{Result, anyhow};
-use log::debug;
+use tracing::debug;
 
 pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
     utils::misc::updatable(list(md)?).await
