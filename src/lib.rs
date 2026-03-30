@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::{fmt, fs, process::Command};
 
 pub mod config;
+pub mod dbus;
 pub mod homemanager;
 pub mod metadata;
 pub mod nixenv;
@@ -126,10 +127,25 @@ fn get_arch() -> String {
 
 lazy_static::lazy_static! {
     pub static ref NIXARCH: String = get_arch();
-    pub static ref CACHEDIR: String = format!("{}/.cache/libsnow", std::env::var("HOME").unwrap());
-    pub static ref CONFIGDIR: String = format!("{}/.config/libsnow", std::env::var("HOME").unwrap());
-    pub static ref CONFIG: String = format!("{}/config.json", &*CONFIGDIR);
-    pub static ref HOME: String = std::env::var("HOME").unwrap();
+    pub static ref CACHEDIR: String = dirs::cache_dir()
+        .expect("Could not determine cache directory")
+        .join("libsnow")
+        .to_string_lossy()
+        .to_string();
+    pub static ref CONFIGDIR: String = dirs::config_dir()
+        .expect("Could not determine config directory")
+        .join("libsnow")
+        .to_string_lossy()
+        .to_string();
+    pub static ref CONFIG: String = dirs::config_dir()
+        .expect("Could not determine config directory")
+        .join("libsnow/config.json")
+        .to_string_lossy()
+        .to_string();
+    pub static ref HOME: String = dirs::home_dir()
+        .expect("Could not determine home directory")
+        .to_string_lossy()
+        .to_string();
     pub static ref IS_NIXOS: bool = std::path::Path::new("/etc/NIXOS").exists();
     pub static ref NIX_BACKEND: NixBackend = detect_nix_backend().unwrap_or(NixBackend::Nix);
 }

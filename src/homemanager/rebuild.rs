@@ -1,15 +1,29 @@
-use crate::{HELPER_EXEC, config::configfile::get_config, nixos::AuthMethod};
+use crate::{HELPER_EXEC, config::configfile::get_config, dbus, nixos::AuthMethod};
 use anyhow::{Result, anyhow};
 use log::debug;
 
 pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
-    let mut child = rebuild_spawn(auth_method)?;
-    let status = child.wait().await?;
-    debug!("{}", status);
-    if !status.success() {
-        return Err(anyhow!("Failed to rebuild"));
+    match auth_method {
+        AuthMethod::Dbus => rebuild_dbus().await,
+        _ => {
+            let mut child = rebuild_spawn(auth_method)?;
+            let status = child.wait().await?;
+            debug!("{}", status);
+            if !status.success() {
+                return Err(anyhow!("Failed to rebuild"));
+            }
+            Ok(())
+        }
     }
-    Ok(())
+}
+
+async fn rebuild_dbus() -> Result<()> {
+    let config = get_config()?;
+    if config.system_for_home_manager {
+        dbus::rebuild("switch").await
+    } else {
+        dbus::rebuild_home("switch").await
+    }
 }
 
 pub fn rebuild_spawn(auth_method: AuthMethod<'_>) -> Result<tokio::process::Child> {

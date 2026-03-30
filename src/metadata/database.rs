@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 use super::search::index_dir_for_db_path;
+use crate::CACHEDIR;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct DatabaseCache {
@@ -18,14 +19,9 @@ pub(crate) enum DatabaseCacheEntry {
 }
 
 pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Result<String> {
-    let cache_file_path = format!("{}/.cache/libsnow/cache.json", std::env::var("HOME")?);
+    let cache_file_path = format!("{}/cache.json", &*CACHEDIR);
     if !PathBuf::from(&cache_file_path).exists() {
-        fs::create_dir_all(
-            PathBuf::from(&cache_file_path)
-                .parent()
-                .context("Invalid path")?,
-        )
-        .await?;
+        fs::create_dir_all(&*CACHEDIR).await?;
         fs::write(&cache_file_path, r#"{"current_rev": "", "new_rev": ""}"#).await?;
     }
     let cache_content = fs::read_to_string(&cache_file_path).await?;
@@ -41,7 +37,7 @@ pub(crate) async fn fetch_database(rev: &str, entry: DatabaseCacheEntry) -> Resu
     }
     fs::write(&cache_file_path, serde_json::to_string(&cachejson)?).await?;
 
-    let outpath = format!("{}/.cache/libsnow/{}.db", std::env::var("HOME")?, rev);
+    let outpath = format!("{}/{}.db", &*CACHEDIR, rev);
 
     if PathBuf::from(&outpath).exists() {
         cleanup(&outpath, &cachejson).await?;
@@ -94,7 +90,7 @@ async fn download_database(rev: &str, outpath: &str) -> Result<()> {
 }
 
 async fn find_newest_cached_db() -> Option<String> {
-    let cache_dir = format!("{}/.cache/libsnow/", std::env::var("HOME").ok()?);
+    let cache_dir = format!("{}/", &*CACHEDIR);
     let mut entries = fs::read_dir(&cache_dir).await.ok()?;
     let mut newest: Option<(std::time::SystemTime, String)> = None;
 
@@ -118,7 +114,7 @@ async fn find_newest_cached_db() -> Option<String> {
 
 async fn cleanup(outpath: &str, cachejson: &DatabaseCache) -> Result<()> {
     // Clean up old databases and their search indexes
-    let cache_dir = format!("{}/.cache/libsnow/", std::env::var("HOME")?);
+    let cache_dir = format!("{}/", &*CACHEDIR);
     let mut entries = fs::read_dir(&cache_dir).await?;
     while let Ok(Some(entry)) = entries.next_entry().await {
         let path = entry.path();

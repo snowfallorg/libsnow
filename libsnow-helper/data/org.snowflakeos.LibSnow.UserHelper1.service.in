@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.snowflakeos.LibSnow.UserHelper1
+Exec=@bindir@/libsnow-helper dbus --session

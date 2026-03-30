@@ -1,3 +1,4 @@
+{ self }:
 {
   config,
   lib,
@@ -72,6 +73,18 @@ in
       default = null;
       description = "Whether home-manager is configured as part of the system config or seperately.";
     };
+
+    helper = {
+      enable = lib.mkEnableOption "libsnow-helper D-Bus daemon for privileged NixOS operations" // {
+        default = true;
+      };
+
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = self.packages.${pkgs.stdenv.hostPlatform.system}.libsnow-helper;
+        description = "The libsnow-helper package to use.";
+      };
+    };
   };
 
   config = lib.mkMerge (
@@ -79,6 +92,16 @@ in
       { environment.systemPackages = systemPkgs; }
 
       { environment.etc."libsnow/config.json".text = configJson; }
+
+      (lib.mkIf cfg.helper.enable {
+        services.dbus.packages = [ cfg.helper.package ];
+        systemd.packages = [ cfg.helper.package ];
+        environment.systemPackages = [ cfg.helper.package ];
+        systemd.services.libsnow-helper.path = [
+          pkgs.nixos-rebuild-ng
+          config.nix.package
+        ];
+      })
     ]
     ++ lib.optionals (libsnowHomeConfig != null) [
       {

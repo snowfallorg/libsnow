@@ -1,6 +1,7 @@
 use crate::{
     HELPER_EXEC,
-    config::configfile::{self, ConfigMode},
+    config::configfile::{self, ConfigMode, LibSnowConfig},
+    dbus,
     homemanager::list::list,
     metadata::Metadata,
     nixos::AuthMethod,
@@ -12,22 +13,36 @@ use tokio::io::AsyncWriteExt;
 use toml::Value as TomlValue;
 
 pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
-    let mut child = install_spawn(pkgs, md, auth_method).await?;
-    let status = child.wait().await?;
-    debug!("{}", status);
-    if !status.success() {
-        return Err(anyhow!("Failed to rebuild"));
+    match auth_method {
+        AuthMethod::Dbus => install_dbus(pkgs, md).await,
+        _ => {
+            let mut child = install_spawn(pkgs, md, auth_method).await?;
+            let status = child.wait().await?;
+            debug!("{}", status);
+            if !status.success() {
+                return Err(anyhow!("Failed to rebuild"));
+            }
+            Ok(())
+        }
     }
-    Ok(())
 }
 
-pub async fn install_spawn(
+async fn install_dbus(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let config = configfile::get_config()?;
+    let (content, _output_path, _arguments) = prepare_install(pkgs, md, &config)?;
+
+    if config.system_for_home_manager {
+        dbus::config(&content, "switch").await
+    } else {
+        dbus::config_home(&content, "switch").await
+    }
+}
+
+fn prepare_install(
     pkgs: &[&str],
     md: &Metadata,
-    auth_method: AuthMethod<'_>,
-) -> Result<tokio::process::Child> {
-    let config = configfile::get_config()?;
-
+    config: &LibSnowConfig,
+) -> Result<(String, String, Vec<String>)> {
     let installed: Vec<String> = list(md)
         .unwrap_or_default()
         .into_iter()
@@ -97,9 +112,26 @@ pub async fn install_spawn(
         }
     };
 
+    let mut arguments = vec!["switch".to_string()];
+    if let Ok(flakedir) = config.get_flake_dir() {
+        arguments.push("--flake".to_string());
+        arguments.push(flakedir);
+    }
+
+    Ok((content, output_path, arguments))
+}
+
+pub async fn install_spawn(
+    pkgs: &[&str],
+    md: &Metadata,
+    auth_method: AuthMethod<'_>,
+) -> Result<tokio::process::Child> {
+    let config = configfile::get_config()?;
+    let (content, output_path, _arguments) = prepare_install(pkgs, md, &config)?;
+
     let mut child = tokio::process::Command::new(if config.system_for_home_manager {
         match auth_method {
-            AuthMethod::Pkexec => "pkexec",
+            AuthMethod::Dbus => unreachable!("D-Bus path handled in install()"),
             AuthMethod::Sudo => "sudo",
             AuthMethod::Custom(cmd) => cmd,
         }

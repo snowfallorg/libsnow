@@ -1,5 +1,5 @@
 use crate::{
-    HELPER_EXEC, PackageUpdate, config::configfile::get_config, homemanager::list::list,
+    HELPER_EXEC, PackageUpdate, config::configfile::get_config, dbus, homemanager::list::list,
     metadata::Metadata, nixos::AuthMethod, utils,
 };
 use anyhow::{Result, anyhow};
@@ -10,13 +10,27 @@ pub async fn updatable(md: &Metadata) -> Result<Vec<PackageUpdate>> {
 }
 
 pub async fn update(auth_method: AuthMethod<'_>) -> Result<()> {
-    let mut child = update_spawn(auth_method)?;
-    let status = child.wait().await?;
-    debug!("{}", status);
-    if !status.success() {
-        return Err(anyhow!("Failed to rebuild"));
+    match auth_method {
+        AuthMethod::Dbus => update_dbus().await,
+        _ => {
+            let mut child = update_spawn(auth_method)?;
+            let status = child.wait().await?;
+            debug!("{}", status);
+            if !status.success() {
+                return Err(anyhow!("Failed to rebuild"));
+            }
+            Ok(())
+        }
     }
-    Ok(())
+}
+
+async fn update_dbus() -> Result<()> {
+    let config = get_config()?;
+    if config.system_for_home_manager {
+        dbus::update("switch").await
+    } else {
+        dbus::update_home("switch").await
+    }
 }
 
 pub fn update_spawn(auth_method: AuthMethod<'_>) -> Result<tokio::process::Child> {

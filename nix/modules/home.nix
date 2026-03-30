@@ -1,3 +1,4 @@
+{ self }:
 {
   config,
   lib,
@@ -57,6 +58,18 @@ in
       default = 5;
       description = "Number of generations to keep.";
     };
+
+    helper = {
+      enable = lib.mkEnableOption "libsnow-helper session D-Bus service for home-manager operations" // {
+        default = true;
+      };
+
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = self.packages.${pkgs.stdenv.hostPlatform.system}.libsnow-helper;
+        description = "The libsnow-helper package to use.";
+      };
+    };
   };
 
   config = lib.mkMerge (
@@ -64,6 +77,11 @@ in
       { home.packages = map getPkg userPkgs; }
 
       { xdg.configFile."libsnow/config.json".text = configJson; }
+
+      (lib.mkIf cfg.helper.enable {
+        xdg.dataFile."dbus-1/services/org.snowflakeos.LibSnow.UserHelper1.service".source =
+          "${cfg.helper.package}/share/dbus-1/services/org.snowflakeos.LibSnow.UserHelper1.service";
+      })
     ]
     ++ userOptFragments
   );

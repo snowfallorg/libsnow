@@ -32,5 +32,7 @@ rustPlatform.buildRustPackage {
   cargoBuildFlags = [
     "--bin"
     "generate-db"
+    "--features"
+    "generate-db"
   ];
 }

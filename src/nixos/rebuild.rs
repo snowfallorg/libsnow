@@ -1,22 +1,31 @@
 use super::AuthMethod;
-use crate::{HELPER_EXEC, config::configfile::get_config};
+use crate::{HELPER_EXEC, config::configfile::get_config, dbus};
 use anyhow::{Result, anyhow};
 use log::debug;
 
 pub async fn rebuild(auth_method: AuthMethod<'_>) -> Result<()> {
-    let mut child = rebuild_spawn(auth_method)?;
-    let status = child.wait().await?;
-    debug!("{}", status);
-    if !status.success() {
-        return Err(anyhow!("Failed to rebuild"));
+    match auth_method {
+        AuthMethod::Dbus => rebuild_dbus().await,
+        _ => {
+            let mut child = rebuild_spawn(auth_method)?;
+            let status = child.wait().await?;
+            debug!("{}", status);
+            if !status.success() {
+                return Err(anyhow!("Failed to rebuild"));
+            }
+            Ok(())
+        }
     }
-    Ok(())
+}
+
+async fn rebuild_dbus() -> Result<()> {
+    dbus::rebuild("switch").await
 }
 
 pub fn rebuild_spawn(auth_method: AuthMethod<'_>) -> Result<tokio::process::Child> {
     let config = get_config()?;
     let child = tokio::process::Command::new(match auth_method {
-        AuthMethod::Pkexec => "pkexec",
+        AuthMethod::Dbus => unreachable!("D-Bus path handled in rebuild()"),
         AuthMethod::Sudo => "sudo",
         AuthMethod::Custom(cmd) => cmd,
     })

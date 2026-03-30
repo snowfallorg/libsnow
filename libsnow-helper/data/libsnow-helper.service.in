@@ -1,0 +1,7 @@
+[Unit]
+Description=LibSnow Helper Daemon
+
+[Service]
+Type=dbus
+BusName=org.snowflakeos.LibSnow.Helper1
+ExecStart=@bindir@/libsnow-helper dbus

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+
+  <vendor>LibSnow</vendor>
+  <vendor_url>https://github.com/snowfallorg/libsnow</vendor_url>
+
+  <action id="org.snowflakeos.libsnow.config">
+    <description>Modify NixOS or Home Manager configuration</description>
+    <message>Authentication is required to modify system configuration</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.snowflakeos.libsnow.update">
+    <description>Update NixOS or Home Manager packages</description>
+    <message>Authentication is required to update packages</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.snowflakeos.libsnow.rebuild">
+    <description>Rebuild NixOS or Home Manager configuration</description>
+    <message>Authentication is required to rebuild the system</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.snowflakeos.libsnow.cancel">
+    <description>Cancel a running NixOS or Home Manager operation</description>
+    <message>Authentication is required to cancel the operation</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+</policyconfig>

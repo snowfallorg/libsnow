@@ -16,8 +16,8 @@
         f: nixpkgs.lib.genAttrs supportedSystems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      nixosModules.libsnow = import ./nix/modules/nixos.nix;
-      homeModules.libsnow = import ./nix/modules/home.nix;
+      nixosModules.libsnow = import ./nix/modules/nixos.nix { inherit self; };
+      homeModules.libsnow = import ./nix/modules/home.nix { inherit self; };
 
       packages = forAllSystems (pkgs: {
         libsnow-helper = pkgs.callPackage ./nix/packages/libsnow-helper.nix { };

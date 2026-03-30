@@ -5,7 +5,7 @@ pub mod remove;
 pub mod update;
 
 pub enum AuthMethod<'a> {
-    Pkexec,
+    Dbus,
     Sudo,
     Custom(&'a str),
 }

@@ -2,6 +2,7 @@ use super::AuthMethod;
 use crate::{
     HELPER_EXEC,
     config::configfile::{self, ConfigMode},
+    dbus,
     metadata::Metadata,
     nixos::list::list_systempackages,
     toml as tomlcfg,
@@ -12,22 +13,32 @@ use tokio::io::AsyncWriteExt;
 use toml::Value as TomlValue;
 
 pub async fn install(pkgs: &[&str], md: &Metadata, auth_method: AuthMethod<'_>) -> Result<()> {
-    let mut child = install_spawn(pkgs, md, auth_method).await?;
-    let status = child.wait().await?;
-    debug!("{}", status);
-    if !status.success() {
-        return Err(anyhow!("Failed to rebuild"));
+    match auth_method {
+        AuthMethod::Dbus => install_dbus(pkgs, md).await,
+        _ => {
+            let mut child = install_spawn(pkgs, md, auth_method).await?;
+            let status = child.wait().await?;
+            debug!("{}", status);
+            if !status.success() {
+                return Err(anyhow!("Failed to rebuild"));
+            }
+            Ok(())
+        }
     }
-    Ok(())
 }
 
-pub async fn install_spawn(
+async fn install_dbus(pkgs: &[&str], md: &Metadata) -> Result<()> {
+    let config = configfile::get_config()?;
+    let (content, _output_path, _arguments) = prepare_install(pkgs, md, &config)?;
+
+    dbus::config(&content, "switch").await
+}
+
+fn prepare_install(
     pkgs: &[&str],
     md: &Metadata,
-    auth_method: AuthMethod<'_>,
-) -> Result<tokio::process::Child> {
-    let config = configfile::get_config()?;
-
+    config: &configfile::LibSnowConfig,
+) -> Result<(String, String, Vec<String>)> {
     let installed: Vec<String> = list_systempackages(md)?
         .into_iter()
         .map(|x| x.attr.to_string())
@@ -96,8 +107,29 @@ pub async fn install_spawn(
         }
     };
 
+    let mut arguments = vec!["switch".to_string()];
+    if let Some(flake) = &config.flake {
+        arguments.push("--flake".to_string());
+        if let Some(host) = &config.host {
+            arguments.push(format!("{}#{}", flake, host));
+        } else {
+            arguments.push(flake.clone());
+        }
+    }
+
+    Ok((content, output_path, arguments))
+}
+
+pub async fn install_spawn(
+    pkgs: &[&str],
+    md: &Metadata,
+    auth_method: AuthMethod<'_>,
+) -> Result<tokio::process::Child> {
+    let config = configfile::get_config()?;
+    let (content, output_path, _arguments) = prepare_install(pkgs, md, &config)?;
+
     let mut child = tokio::process::Command::new(match auth_method {
-        AuthMethod::Pkexec => "pkexec",
+        AuthMethod::Dbus => unreachable!("D-Bus path handled in install()"),
         AuthMethod::Sudo => "sudo",
         AuthMethod::Custom(cmd) => cmd,
     })
