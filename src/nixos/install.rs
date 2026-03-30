@@ -47,9 +47,9 @@ fn prepare_install(
 
     let mut pkgs_to_install = vec![];
     for pkg in pkgs {
-        if let Ok(info) = md.get(pkg) {
-            if installed.contains(&info.pname) {
-                debug!("{} is already installed", info.pname);
+        if md.get(pkg).is_ok() {
+            if installed.contains(&pkg.to_string()) {
+                debug!("{} is already installed", pkg);
             } else {
                 pkgs_to_install.push(pkg.to_string());
             }
