@@ -10,6 +10,13 @@ use zbus::{Connection, proxy};
 )]
 trait Helper1 {
     fn config(&self, content: &str, action: &str) -> zbus::Result<()>;
+    fn config_home(&self, content: &str, action: &str) -> zbus::Result<()>;
+    fn config_both(
+        &self,
+        system_content: &str,
+        home_content: &str,
+        action: &str,
+    ) -> zbus::Result<()>;
     fn update(&self, action: &str) -> zbus::Result<()>;
     fn rebuild(&self, action: &str) -> zbus::Result<()>;
     fn cancel(&self) -> zbus::Result<()>;
@@ -55,6 +62,22 @@ pub async fn config(content: &str, action: &str) -> Result<()> {
     Ok(Helper1Proxy::new(&conn)
         .await?
         .config(content, action)
+        .await?)
+}
+
+pub async fn config_system_home(content: &str, action: &str) -> Result<()> {
+    let conn = system_conn().await?;
+    Ok(Helper1Proxy::new(&conn)
+        .await?
+        .config_home(content, action)
+        .await?)
+}
+
+pub async fn config_both(system_content: &str, home_content: &str, action: &str) -> Result<()> {
+    let conn = system_conn().await?;
+    Ok(Helper1Proxy::new(&conn)
+        .await?
+        .config_both(system_content, home_content, action)
         .await?)
 }
 

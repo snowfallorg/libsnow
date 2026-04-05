@@ -65,14 +65,22 @@ fn delete_generations(profile_path: &str, generations: Option<u32>) -> Result<()
 }
 
 fn register_restore_on_sigint(path: &str, backup: &str) {
+    register_restore_files_on_sigint(&[(path, backup)]);
+}
+
+fn register_restore_files_on_sigint(files: &[(&str, &str)]) {
+    let pairs: Vec<(String, String)> = files
+        .iter()
+        .map(|(p, b)| (p.to_string(), b.to_string()))
+        .collect();
     let mut signals = Signals::new([SIGINT]).expect("failed to register SIGINT handler");
-    let p = path.to_string();
-    let b = backup.to_string();
     thread::spawn(move || {
         for sig in signals.forever() {
             if sig == SIGINT {
-                let mut file = File::create(&p).expect("failed to restore file on SIGINT");
-                write!(file, "{}", &b).expect("failed to write backup on SIGINT");
+                for (p, b) in &pairs {
+                    let mut file = File::create(p).expect("failed to restore file on SIGINT");
+                    write!(file, "{}", b).expect("failed to write backup on SIGINT");
+                }
                 std::process::exit(1);
             }
         }
@@ -136,6 +144,42 @@ pub fn write_file_home(
     content: Option<String>,
 ) -> Result<()> {
     write_file_impl(path, args, generations, content, rebuild_home)
+}
+
+pub fn write_file_both(
+    system_path: &str,
+    home_path: &str,
+    args: Vec<String>,
+    generations: Option<u32>,
+    system_content: String,
+    home_content: String,
+) -> Result<()> {
+    let system_backup = fs::read_to_string(system_path)?;
+    let home_backup = fs::read_to_string(home_path)?;
+
+    register_restore_files_on_sigint(&[(system_path, &system_backup), (home_path, &home_backup)]);
+
+    let restore_both = |err| -> Result<()> {
+        let mut f = File::create(system_path)?;
+        write!(f, "{}", &system_backup)?;
+        let mut f = File::create(home_path)?;
+        write!(f, "{}", &home_backup)?;
+        Err(err)
+    };
+
+    let mut file = File::create(system_path)?;
+    write!(file, "{}", &system_content)?;
+
+    let mut file = File::create(home_path)?;
+    if let Err(e) = write!(file, "{}", &home_content) {
+        return restore_both(e.into());
+    }
+
+    if let Err(e) = rebuild(args, generations) {
+        restore_both(e)
+    } else {
+        Ok(())
+    }
 }
 
 fn update_impl(

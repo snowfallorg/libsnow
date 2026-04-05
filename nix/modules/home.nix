@@ -3,23 +3,28 @@
   config,
   lib,
   pkgs,
-  libsnowHomeConfig,
-  libsnowUser,
   ...
-}:
+}@args:
 
 let
   cfg = config.libsnow;
-  toml = builtins.fromTOML (builtins.readFile libsnowHomeConfig);
+
+  libsnowHomeConfig = args.libsnowHomeConfig or null;
+  libsnowUser = args.libsnowUser or null;
 
   getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
 
-  optionFragments =
-    opts: lib.mapAttrsToList (path: value: lib.setAttrByPath (lib.splitString "." path) value) opts;
+  applyOptions =
+    opts:
+    lib.mkMerge (
+      lib.mapAttrsToList (path: value: lib.setAttrByPath (lib.splitString "." path) value) opts
+    );
 
-  userSection = toml.${libsnowUser} or { };
+  toml =
+    if libsnowHomeConfig != null then builtins.fromTOML (builtins.readFile libsnowHomeConfig) else { };
+
+  userSection = if libsnowUser != null then toml.${libsnowUser} or { } else { };
   userPkgs = userSection.packages or [ ];
-  userOptFragments = optionFragments (userSection.options or { });
 
   configJson = builtins.toJSON (
     lib.filterAttrs (_: v: v != null) {
@@ -29,12 +34,18 @@ let
         host
         generations
         ;
-      mode = "toml";
+      inherit (cfg) mode;
     }
   );
 in
 {
   options.libsnow = {
+    mode = lib.mkOption {
+      type = lib.types.str;
+      default = if libsnowHomeConfig != null then "toml" else "nix";
+      description = "Configuration mode. \"toml\" when using TOML config files, \"nix\" when using plain Nix.";
+    };
+
     home_config_file = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -83,6 +94,6 @@ in
           "${cfg.helper.package}/share/dbus-1/services/org.snowflakeos.LibSnow.UserHelper1.service";
       })
     ]
-    ++ userOptFragments
+    ++ [ (applyOptions (userSection.options or { })) ]
   );
 }

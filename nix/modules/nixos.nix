@@ -3,24 +3,31 @@
   config,
   lib,
   pkgs,
-  libsnowSystemConfig,
-  libsnowHomeConfig ? null,
   ...
-}:
+}@args:
 
 let
   cfg = config.libsnow;
-  systemToml = builtins.fromTOML (builtins.readFile libsnowSystemConfig);
-  homeToml =
-    if libsnowHomeConfig != null then builtins.fromTOML (builtins.readFile libsnowHomeConfig) else { };
+
+  libsnowSystemConfig = args.libsnowSystemConfig or null;
+  libsnowHomeConfig = args.libsnowHomeConfig or null;
 
   getPkg = name: lib.getAttrFromPath (lib.splitString "." name) pkgs;
 
-  optionFragments =
-    opts: lib.mapAttrsToList (path: value: lib.setAttrByPath (lib.splitString "." path) value) opts;
+  applyOptions =
+    opts:
+    lib.mkMerge (
+      lib.mapAttrsToList (path: value: lib.setAttrByPath (lib.splitString "." path) value) opts
+    );
 
-  systemPkgs = map getPkg (systemToml.packages or [ ]);
-  systemOptFragments = optionFragments (systemToml.options or { });
+  systemToml =
+    if libsnowSystemConfig != null then
+      builtins.fromTOML (builtins.readFile libsnowSystemConfig)
+    else
+      { };
+
+  homeToml =
+    if libsnowHomeConfig != null then builtins.fromTOML (builtins.readFile libsnowHomeConfig) else { };
 
   configJson = builtins.toJSON (
     lib.filterAttrs (_: v: v != null) {
@@ -32,12 +39,18 @@ let
         generations
         system_config_file
         ;
-      mode = "toml";
+      inherit (cfg) mode;
     }
   );
 in
 {
   options.libsnow = {
+    mode = lib.mkOption {
+      type = lib.types.str;
+      default = if libsnowSystemConfig != null then "toml" else "nix";
+      description = "Configuration mode. \"toml\" when using TOML config files, \"nix\" when using plain Nix.";
+    };
+
     system_config_file = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -89,9 +102,10 @@ in
 
   config = lib.mkMerge (
     [
-      { environment.systemPackages = systemPkgs; }
-
-      { environment.etc."libsnow/config.json".text = configJson; }
+      {
+        environment.etc."libsnow/config.json".text = configJson;
+        environment.systemPackages = map getPkg (systemToml.packages or [ ]);
+      }
 
       (lib.mkIf cfg.helper.enable {
         services.dbus.packages = [ cfg.helper.package ];
@@ -107,15 +121,13 @@ in
       {
         home-manager.users = lib.mapAttrs (
           _user: userCfg:
-          lib.mkMerge (
-            [
-              { home.packages = map getPkg (userCfg.packages or [ ]); }
-            ]
-            ++ optionFragments (userCfg.options or { })
-          )
+          lib.mkMerge [
+            { home.packages = map getPkg (userCfg.packages or [ ]); }
+            (applyOptions (userCfg.options or { }))
+          ]
         ) homeToml;
       }
     ]
-    ++ systemOptFragments
+    ++ [ (applyOptions (systemToml.options or { })) ]
   );
 }

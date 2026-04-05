@@ -33,7 +33,7 @@ async fn install_dbus(pkgs: &[&str], md: &Metadata) -> Result<()> {
     let (content, _output_path, _arguments) = prepare_install(pkgs, md, &config)?;
 
     if config.system_for_home_manager {
-        dbus::config(&content, "switch").await
+        dbus::config_system_home(&content, "switch").await
     } else {
         dbus::config_home(&content, "switch").await
     }

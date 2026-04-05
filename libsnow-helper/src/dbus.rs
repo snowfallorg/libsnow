@@ -270,6 +270,24 @@ async fn check_polkit_auth(
     Ok(())
 }
 
+struct AuthContext {
+    sender: String,
+    cfg: LibSnowConfig,
+}
+
+async fn authorize(
+    connection: &Connection,
+    hdr: &zbus::message::Header<'_>,
+    action: &str,
+    polkit_action: &str,
+) -> Result<AuthContext, HelperError> {
+    check_polkit_auth(connection, hdr, polkit_action).await?;
+    validate_action(action)?;
+    let sender = sender_from_header(hdr)?;
+    let cfg = LibSnowConfig::load_system()?;
+    Ok(AuthContext { sender, cfg })
+}
+
 // System bus helper (runs as root, requires polkit authorization)
 pub struct SystemHelper {
     inner: HelperInner,
@@ -284,16 +302,58 @@ impl SystemHelper {
         content: String,
         action: String,
     ) -> Result<(), HelperError> {
-        check_polkit_auth(connection, &hdr, "org.snowflakeos.libsnow.config").await?;
-        validate_action(&action)?;
-        let sender = sender_from_header(&hdr)?;
-        let cfg = LibSnowConfig::load_system()?;
-        let output = cfg.system_config_path()?;
-        let arguments = cfg.build_system_args(&action);
-        let gens = cfg.generations;
+        let ctx = authorize(connection, &hdr, &action, "org.snowflakeos.libsnow.config").await?;
+        let output = ctx.cfg.system_config_path()?;
+        let arguments = ctx.cfg.build_system_args(&action);
+        let gens = ctx.cfg.generations;
         self.inner
-            .run_op(Some(&sender), move || {
+            .run_op(Some(&ctx.sender), move || {
                 operations::write_file(&output, arguments, gens, Some(content))
+            })
+            .await
+    }
+
+    async fn config_home(
+        &self,
+        #[zbus(header)] hdr: zbus::message::Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+        content: String,
+        action: String,
+    ) -> Result<(), HelperError> {
+        let ctx = authorize(connection, &hdr, &action, "org.snowflakeos.libsnow.config").await?;
+        let output = ctx.cfg.home_config_path()?;
+        let arguments = ctx.cfg.build_system_args(&action);
+        let gens = ctx.cfg.generations;
+        self.inner
+            .run_op(Some(&ctx.sender), move || {
+                operations::write_file(&output, arguments, gens, Some(content))
+            })
+            .await
+    }
+
+    async fn config_both(
+        &self,
+        #[zbus(header)] hdr: zbus::message::Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+        system_content: String,
+        home_content: String,
+        action: String,
+    ) -> Result<(), HelperError> {
+        let ctx = authorize(connection, &hdr, &action, "org.snowflakeos.libsnow.config").await?;
+        let system_path = ctx.cfg.system_config_path()?;
+        let home_path = ctx.cfg.home_config_path()?;
+        let arguments = ctx.cfg.build_system_args(&action);
+        let gens = ctx.cfg.generations;
+        self.inner
+            .run_op(Some(&ctx.sender), move || {
+                operations::write_file_both(
+                    &system_path,
+                    &home_path,
+                    arguments,
+                    gens,
+                    system_content,
+                    home_content,
+                )
             })
             .await
     }
@@ -304,15 +364,12 @@ impl SystemHelper {
         #[zbus(connection)] connection: &Connection,
         action: String,
     ) -> Result<(), HelperError> {
-        check_polkit_auth(connection, &hdr, "org.snowflakeos.libsnow.update").await?;
-        validate_action(&action)?;
-        let sender = sender_from_header(&hdr)?;
-        let cfg = LibSnowConfig::load_system()?;
-        let flake_dir = cfg.flake_dir_or_err()?;
-        let arguments = cfg.build_system_args(&action);
-        let gens = cfg.generations;
+        let ctx = authorize(connection, &hdr, &action, "org.snowflakeos.libsnow.update").await?;
+        let flake_dir = ctx.cfg.flake_dir_or_err()?;
+        let arguments = ctx.cfg.build_system_args(&action);
+        let gens = ctx.cfg.generations;
         self.inner
-            .run_op(Some(&sender), move || {
+            .run_op(Some(&ctx.sender), move || {
                 operations::update(&flake_dir, arguments, gens)
             })
             .await
@@ -324,14 +381,13 @@ impl SystemHelper {
         #[zbus(connection)] connection: &Connection,
         action: String,
     ) -> Result<(), HelperError> {
-        check_polkit_auth(connection, &hdr, "org.snowflakeos.libsnow.rebuild").await?;
-        validate_action(&action)?;
-        let sender = sender_from_header(&hdr)?;
-        let cfg = LibSnowConfig::load_system()?;
-        let arguments = cfg.build_system_args(&action);
-        let gens = cfg.generations;
+        let ctx = authorize(connection, &hdr, &action, "org.snowflakeos.libsnow.rebuild").await?;
+        let arguments = ctx.cfg.build_system_args(&action);
+        let gens = ctx.cfg.generations;
         self.inner
-            .run_op(Some(&sender), move || operations::rebuild(arguments, gens))
+            .run_op(Some(&ctx.sender), move || {
+                operations::rebuild(arguments, gens)
+            })
             .await
     }
 
